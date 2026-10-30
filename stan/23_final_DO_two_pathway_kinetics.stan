@@ -188,10 +188,9 @@ model {
   }
 }
 generated quantities {
-  real k_aquifer_zero_order_mg_L_yr = (aq_order==0)
-                                      ? k_ref*C_ref : 0;
-  real k_aquifer_first_order_yr_inv = (aq_order==1)
-                                      ? k_ref : 0;
+  // One active kinetic rate per run. Units depend on aq_order:
+  // zero = mg/L/year; first = year^-1.
+  real aquifer_rate_actual = (aq_order==0) ? k_ref*C_ref : k_ref;
   real LSR_DO_deficit = Csat_rain-LSR_DO_at_water_table;
   real LSR_zero_order_exposure = LSR_DO_deficit;
   real LSR_first_order_exposure = -log(survival_LSR);
