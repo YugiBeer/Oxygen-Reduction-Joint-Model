@@ -169,7 +169,6 @@ log_posterior <- function(z, data, piston, prior_median) {
     R, cfg$river_DO_prior_mean, cfg$river_DO_prior_SD,
     log = TRUE
   ) +
-    # Constant Uniform P prior omitted because it cancels in MH.
     dnorm(k, 0, cfg$k_prior_SD, log = TRUE) +
     logk +
     dnorm(sigma, 0, cfg$extra_residual_SD_prior,
@@ -526,7 +525,7 @@ k_intervals <- posterior %>%
   mutate(model = forcats::fct_reorder(model, median))
 p_k <- ggplot(
   k_intervals,
-  aes(median, model, xmin = lower95, xmax = upper95)
+  aes(median, model)
 ) +
   geom_segment(aes(x = lower95, xend = upper95,
                    y = model, yend = model), linewidth = 1) +
