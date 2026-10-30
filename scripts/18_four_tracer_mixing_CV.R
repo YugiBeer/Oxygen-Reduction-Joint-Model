@@ -32,7 +32,9 @@ library(tidyverse)
 setwd(here::here("Oxygen-Reduction-Joint-Model"))
 
 cfg <- list(
-  input = "data/groundwater.csv",
+  input = if (file.exists("data/Uwe_HP_data_prepared.csv")) {
+    "data/Uwe_HP_data_prepared.csv"
+  } else "data/groundwater.csv",
   model = "stan/18_four_tracer_joint_mixing.stan",
   endmember_prior_scale = 1,  # also rerun with 2 as sensitivity
   seed = 20261031L,
@@ -67,7 +69,16 @@ d <- read_csv(
   mutate(sample_index = row_number(), .before = 1)
 required <- c("Site_ID", "Depth", "O18", "Cl", "Na",
               "xs_Air", "xs_Air_uncertainty")
-stopifnot(all(required %in% names(d)), nrow(d) >= 35)
+if (!all(required %in% names(d))) {
+  stop(
+    "Four-tracer input is missing: ",
+    paste(setdiff(required, names(d)), collapse = ", "),
+    ". Use data/Uwe_HP_data_prepared.csv from the original PRIVATE ",
+    "Lincoln-Environmental/Oxygen-Reduction repository; the older ",
+    "data/groundwater.csv has NO sodium column."
+  )
+}
+stopifnot(nrow(d) >= 35)
 names_tracers <- c("O18", "Cl", "Na", "xs_Air")
 
 present <- sapply(names_tracers, function(k) {
