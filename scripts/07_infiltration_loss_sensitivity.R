@@ -359,7 +359,7 @@ ggsave("plots/infiltration_profile_k.png", p2,
 
 p3 <- required %>%
   filter(abs(river_reference_DO_mg_L - cfg$river_DO) < 1e-10,
-         river_dominated) %>%
+         river_dominated, infiltration_only_feasible) %>%
   ggplot(aes(
     MRT, 100 * min_riverbed_loss_fraction,
     shape = factor(confined)
@@ -369,7 +369,7 @@ p3 <- required %>%
     title = "Minimum infiltration loss if no aquifer depletion occurs",
     subtitle = paste(
       "River fraction >= 0.8; rainfall component may be fully anoxic;",
-      "site 2801 is infeasible at the fixed river reference"
+      "site 2801 omitted because its DO exceeds the fixed river reference"
     ),
     x = "Mean residence time (years)",
     y = "Minimum loss from river-recharge component (%)",
