@@ -490,3 +490,46 @@ Local gitignored outputs:
 - `plots/mixing_pairwise_source_fraction_disagreement.png`
 
 **Next priority:** establish whether xs_Air behaves as a conservative mixing tracer and whether variable δ18O endmembers improve predictions after full Bayesian model-15 convergence; don't add sodium, δ²H, conductivity, sulfate or redox indicators to the mixing likelihood without independent physical justification and suitable endmember data.
+
+## Four-tracer source mixing with sodium (script 18; 31 October 2026)
+
+**Research question:** Does adding sodium to the existing δ18O, chloride and excess-air tracers improve source-mixing estimates and predict other withheld tracers, without confusing the tightly correlated major ions with independent endmember information?
+
+This is still **TWO recharge sources** (river recharge and land-surface recharge, LSR), **not four sources**. It does **not** use DO, groundwater MRT, nitrate, excess N2 or the preassigned source categories.
+
+New files:
+- `stan/18_four_tracer_joint_mixing.stan`
+- `scripts/18_four_tracer_mixing_CV.R`
+
+Run with CmdStanR and CmdStan installed, using the locally prepared **private** `data/groundwater.csv`:
+
+```r
+source("scripts/18_four_tracer_mixing_CV.R")
+```
+
+The Stan model provides a **matched three-tracer control** (δ18O, Cl, excess air) and a **four-tracer** model (δ18O, Cl, Na, excess air) with identical priors on shared endmembers and tracer noise. Both include a bounded latent LSR fraction per well. **Temporal/spatial LSR δ18O variability** is represented as a zero-mean random endmember deviation integrated out of the likelihood: its additional δ18O variance is `fLSR^2 * tau_LSR_O18^2`, with `tau_LSR_O18 ~ HalfNormal(0.8‰)`. This does not estimate rainfall isotope seasonality or hydrograph-based recharge history.
+
+The joint Na–Cl likelihood uses a bivariate normal conditional formulation when both ions are present, accounting for a fitted **residual correlation after conditioning on source mixing**, with an informative zero-centred prior on rho. When one ion is withheld, the remaining observed ion enters the other ion's conditional posterior predictive distribution. This is essential for fair validation of correlated ions. An assumed analytical error model assigns minimum analytical SDs of **1 mg/L Cl**, **0.5 mg/L Na**, and 3% of concentration if larger. These analytical uncertainties are **assumptions**, not supplied by the source CSV. The model fits additional study-level discrepancy SDs and uses the available xs_Air uncertainty. Na can be altered by cation exchange; no explicit exchange stoichiometry is inferred here.
+
+The priors for river Na and LSR Na (centres 6.6 and 44.33 mg/L respectively), together with chloride and δ18O prior centres, are derived from the **same groundwater study**. These priors are not an external endmember survey. Repeat the experiment using `cfg$endmember_prior_scale = 2` in the R script to examine prior sensitivity, and consider external recharge-water time series before interpreting the mixture as ground truth.
+
+**Validation:** Four deterministic rotations mask exactly one measured tracer per well in each fit; every available tracer measurement is withheld exactly once over the four rotations. Related Eastbourne, Gilbertson and Flaxmere well samples share the same held-out tracer within each rotation. A withheld tracer is removed from the likelihood **and its input value is overwritten with zero** before the fit. The held-out concentration is predicted from the other measurements; four-tracer Na and Cl forecasts use their appropriate conditional distributions. The fair three-versus-four model ranking uses ONLY shared targets: δ18O, chloride, excess air. **Predictive Na results are a separate assessment of the four-tracer model**, rather than scored as an advantage over a baseline that never uses Na.
+
+Compare **per-tracer RMSE, MAE, bias, normalised RMSE, 95% predictive coverage, paired absolute errors, MCMC Rhat/ESS and divergences**. The optional full-data fits compare posterior LSR fraction medians and intervals. Do not conclude sodium improves mixing simply because the four-tracer model fits Na well *in sample*.
+
+Outputs (local, all gitignored):
+- `outputs/four_tracer_CV_masks.csv`
+- `outputs/four_tracer_CV_predictions.csv`
+- `outputs/four_tracer_CV_convergence.csv`
+- `outputs/four_tracer_CV_scores_by_tracer.csv`
+- `outputs/four_tracer_CV_scores_shared_outcomes.csv`
+- `outputs/four_tracer_CV_paired_predictions.csv`
+- `outputs/four_tracer_full_data_LSR_fractions.csv`
+- `outputs/four_tracer_full_data_endmembers.csv`
+- `outputs/four_tracer_LSR_fraction_change.csv`
+- `plots/four_tracer_CV_predictions.png`
+- `plots/four_tracer_CV_normalised_error.png`
+
+**Known original-data diagnostic:** The currently inspected prepared CSV contains 43 records; 42 contain Na and Cl. Na–Cl Pearson correlation is **0.975**, but this primarily describes the common concentration gradient, not necessarily conditional residual correlation. The endpoint mixing line is Na(mg/L) = **3.244 + 0.6848×Cl(mg/L)**. Seven of 42 sodium concentrations differ from that fixed-endpoint line by over 3 mg/L, supporting a test of mixing and chemical departures. This is descriptive evidence only, not a completed Bayesian predictive result. The data include isotope variation and source-endmember uncertainties that may remain underidentified.
+
+**Implementation status:** The Stan/R scripts were committed and statically checked, but **R, CmdStan and CmdStanR are not available in this execution environment**. No posterior predictive scores, credible intervals or chain-convergence results have been fabricated. Please run the script in Positron; don't use or propagate revised source fractions to the DO model until there is evidence of held-out improvement and adequate convergence.
