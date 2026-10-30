@@ -670,3 +670,30 @@ The slight ~0.019 N₂ RMSE improvement in the low-DO model is not convincing, e
 This outcome is scientifically plausible. Excess N₂ reports accumulated nitrate reduction, requiring nitrate availability, and can persist after oxygen concentrations change or water bodies mix. Present well DO does not measure how much reduction occurred over the groundwater history. An empirical N₂ response term is not a physical oxygen-budget constraint. **N₂ may inform source mixing/age or redox propensity without necessarily constraining effective LSR entry DO, k, or their partition uniquely**.
 
 **Validation status:** The two Stan/R files are committed and have been structurally reviewed, but not executed/compiled in this environment. No Stan posterior credible interval or 5-fold Bayesian prediction score is yet available. Review chain Rhat, bulk ESS, divergences, threshold sensitivity, and results with/without well 16758 before treating joint predictions as evidence of identifiable redox pathways.
+
+
+## Excess-air ablation in paired DO/excess-N₂ model (script 21; 31 October 2026)
+
+**Question:** Does using the reported excess-air concentration as a *recharge-mixing tracer* materially help predict groundwater DO or excess N₂, or constrain their shared apparent oxygen-loss budget? Excess air is not itself part of the DO-reduction equation; it enters indirectly through posterior LSR versus river fraction estimates.
+
+New file `scripts/21_excess_air_ablation_paired_DO_N2.R` runs the same `stan/20_joint_paired_DO_excessN2.stan` model using the updated script `scripts/20_joint_paired_DO_excessN2.R` with `include_excess_air=TRUE` (δ18O, Cl, Na, excess air) and `FALSE` (δ18O, Cl, Na only). Excluding excess air **masks the entire xs_Air likelihood and zeroes the corresponding Stan input**; it does NOT exclude wells, change the mixing endmember/DO/MRT priors, or change measured reactive xs_N2. That xs_N2 measurement retains whatever excess-air/gas corrections were used to calculate it originally. Therefore this sensitivity **does not test or remove the gas correction used to calculate xs_N2**. Investigate the calculation separately if excess-air determination may be inaccurate.
+
+The default ablation compares **DO-only**, **age-related excess-N₂**, and **excess-N₂ linked to low-DO exposure** formulations under **both mixing-tracer definitions**. It retains exactly the same 42 groundwater samples with DO, xs_N2 and MRT; five-fold cross-validation holds out both DO and N₂ together for named well groups while retaining all other available mixing tracers and MRT. This is 6 full Stan fits and up to 30 grouped-CV fits; expensive. Run in Positron:
+
+```r
+source("scripts/21_excess_air_ablation_paired_DO_N2.R")
+```
+
+Set `comparison$run_only_fold=1L` to smoke-test one held-out fold; `comparison$run_CV=FALSE` for the six full-data posteriors; `comparison$exclude_16758=TRUE` to test sensitivity to the high-excess-N₂ well. The program stores the two variants independently via `_withair` / `_noair` suffixes, then combines paired model posterior budgets, fractions and held-out DO/N₂ prediction scores to separate gitignored CSV and figure outputs. Per-well latent fLSR is sampled jointly with the oxygen response. Check Rhat, ESS and HMC divergences before treating credible-interval differences as meaningful. The two model runs have identical random seeds and grouped folds.
+
+**Independent screening completed (NOT full Bayesian inference):** An additional private SciPy tracer-only MAP calculation fitted the same four-tracer binary mixing model including Na–Cl correlated residuals and variable LSR isotope signature, then refitted it after completely dropping excess air. Source fractions were obtained by integrating the latent mixing fraction at fitted global tracer parameters (21-node quadrature). These fixed tracer-only fractions were then used for a matched five-fold regularised DO/excess-N₂ validation, with **both outcomes withheld**. The source fractions from these fits are point estimates, and this screening does not propagate posterior uncertainty, so its errors are **not** Stan Bayesian-CV scores.
+
+| Paired response model | With air: DO RMSE | Without air: DO RMSE | With air: xs_N2 RMSE | Without air: xs_N2 RMSE |
+|---|---:|---:|---:|---:|
+| Independent N₂ source + age | 1.711 | 1.714 | 1.369 | 1.369 |
+| N₂ linked to cumulative DO loss | 1.714 | 1.716 | 1.380 | 1.378 |
+| N₂ linked to exposure below 2 mg/L DO | 1.717 | 1.718 | 1.349 | 1.350 |
+
+DO in mg/L; excess N₂ in original dataset units. On all 42 wells, the median absolute change in MAP-based LSR fraction was ~**0.004**, maximum ~**0.070**. The apparent advantage of including excess air is only **0.001–0.003 mg/L DO RMSE**, with no consistent extra-N₂ advantage. This is not a meaningful predictive advantage given much larger model residuals. Excluding site 16758 gives the same general result: DO RMSE shifts only a few thousandths and excess-N₂ RMSE differences stay around thousandths.
+
+**Interpretation:** It is reasonable to use **δ18O + Cl + Na** as a parsimonious conservative-tracer baseline *if* the full joint Stan ablation confirms similar held-out predictions, reasonable predictive coverage and acceptable sampler diagnostics. But Cl and Na are correlated and potentially reactive; with temporally variable δ18O, omitting excess air may reduce physically independent source information and broaden posterior fractions even when DO predictive scores barely change. Compare full posterior uncertainty rather than judging solely by predictive RMSE. Do not treat excess N₂ as a direct O₂ stoichiometric constraint: nitrate reduction generally begins after oxygen depletion, and its reactive signal also depends on nitrate supply, flow history and possible mixing.
