@@ -299,9 +299,13 @@ scenario <- tibble(
   label = names(cfg$persistent_variance_fractions),
   q = as.numeric(cfg$persistent_variance_fractions)
 )
-specs <- tidyr::crossing(
-  scenario, use_age = c(FALSE, TRUE)
-) %>%
+specs <- map_dfr(seq_len(nrow(scenario)), function(i) {
+  tibble(
+    label = scenario$label[i],
+    q = scenario$q[i],
+    use_age = c(FALSE, TRUE)
+  )
+}) %>%
   mutate(model = if_else(
     use_age, "Age-dependent", "Recharge-only"
   ))
