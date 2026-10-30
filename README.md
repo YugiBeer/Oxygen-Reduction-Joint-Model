@@ -140,7 +140,7 @@ Script 07 tests the remaining major uncertainty in the apparent oxygen reduction
 - Use grouped five-fold CV (related Eastbourne, Gilbertson and Flaxmere wells together), reporting within-sample and held-out RMSE separately.
 - Independently calculate the *minimum* riverbed oxygen loss each well requires if **no loss occurs after infiltration**, allowing its rainfall-derived water to be entirely anoxic. This is an extremely favourable assumption for the infiltration-only explanation: oxygen in rainfall recharge would require yet more loss from the river component.
 - Repeat required-loss calculation for river references 5.6, 7.5 and 9.4 mg/L. Flag samples, notably site 2801 at 7.5 mg/L, whose DO exceeds the maximum implied by these fixed source bounds. A river sample can temporarily exceed its long-run mean; this is not evidence of oxygen production in the aquifer.
-- Compare physically bounded k=0 models with shared effective source DO or different effective river DO for confined versus unconfined wells, against an age-dependent model with river mean fixed at 7.5 mg/L.
+- Compare physically bounded k=0 models with shared effective source DO, with different river DO for confined versus unconfined wells, or with **both river and rainfall effective DO varying by confinement**; contrast these against an age-dependent model with river mean fixed at 7.5 mg/L.
 
 Output tables:
 - `outputs/infiltration_loss_profile.csv`
