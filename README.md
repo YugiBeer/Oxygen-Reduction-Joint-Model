@@ -648,7 +648,7 @@ Excess N₂ has a **Student-t(df=4)** observation likelihood with the provided `
 source("scripts/20_joint_paired_DO_excessN2.R")
 ```
 
-Default fits four four-chain full-data models and 20 four-chain grouped-CV fits. To reduce computation, set `cfg$run_CV=FALSE` for the full posterior comparison only, or `cfg$run_only_fold=1L` for a single validation fold. The script's `cfg$exclude_16758=TRUE` option reruns everything without site 16758, which reports **excess N₂ 8.8, DO 0.3 mg/L, MRT 70 years**. The full original dataset has 43 records, of which 42 have usable DO, excess N₂ and MRT (Frimley lacks MRT). Excluding 16758 leaves 41 usable samples. `cfg$low_DO_threshold` allows 1, 2 and 3 mg/L threshold tests. Results have descriptive filenames incorporating the n, outlier exclusion and threshold.
+Default fits four four-chain full-data models and 20 four-chain grouped-CV fits. To reduce computation, set `cfg$run_CV=FALSE` for the full posterior comparison only, or `cfg$run_only_fold=1L` for a single validation fold. The script's `cfg$exclude_16758=TRUE` option reruns everything without site 16758, a high-excess-N₂ sample. The full original dataset has 43 records, of which 42 have usable DO, excess N₂ and MRT (Frimley lacks MRT). Excluding 16758 leaves 41 usable samples. `cfg$low_DO_threshold` allows 1, 2 and 3 mg/L threshold tests. Results have descriptive filenames incorporating the n, outlier exclusion and threshold.
 
 Outputs are **local, gitignored**:
 - `outputs/joint_DO_N2_20_full_posteriors_*`, `joint_DO_N2_20_per_well_*`, `joint_DO_N2_20_convergence_*`.
