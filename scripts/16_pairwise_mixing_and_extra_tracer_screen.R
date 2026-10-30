@@ -354,14 +354,14 @@ ggsave(
 
 p2 <- fraction_details %>%
   select(
-    Site_ID, fLSR_O18_clipped,
+    sample_index, Site_ID, fLSR_O18_clipped,
     fLSR_Cl_clipped, fLSR_air_clipped
   ) %>%
   pivot_longer(
     starts_with("fLSR_"),
     names_to = "tracer", values_to = "fraction"
   ) %>%
-  ggplot(aes(tracer, fraction, group = Site_ID)) +
+  ggplot(aes(tracer, fraction, group = sample_index)) +
   geom_line(alpha = .2) +
   geom_point(alpha = .55) +
   coord_flip() +
