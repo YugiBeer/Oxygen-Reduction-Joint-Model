@@ -240,6 +240,7 @@ write_csv(summary_required, "outputs/infiltration_required_loss_summary.csv")
 #
 # "shared" fits effective river entry DO R and rain DO P, with k=0.
 # "confined" fits R_unconfined, R_confined and common rain DO P, k=0.
+# "both sources" fits confined/unconfined R and P independently, k=0.
 # "age" fixes R=7.5 and fits P,k (no explicit infiltration-loss term).
 #
 # A confined / unconfined contrast is a weak proxy for spatial variance.
@@ -256,6 +257,19 @@ estimate_model <- function(dat, model) {
     starts <- list(c(6, 2, 5), c(4, 1, 8), c(7, 5, 3))
     forward <- function(z, a) {
       a$fR * if_else(a$confined == 1L, z[2], z[1]) + a$fP * z[3]
+    }
+  } else if (model == "Both-sources-varying infiltration-only") {
+    bounds_min <- c(0, 0, 0, 0)
+    bounds_max <- c(
+      cfg$river_DO, cfg$river_DO,
+      cfg$rain_DO_max, cfg$rain_DO_max
+    )
+    starts <- list(
+      c(6, 2, 6, 2), c(4, 1, 8, 1), c(7, 5, 3, 6)
+    )
+    forward <- function(z, a) {
+      a$fR * if_else(a$confined == 1L, z[2], z[1]) +
+        a$fP * if_else(a$confined == 1L, z[4], z[3])
     }
   } else if (model == "First-order age-dependent") {
     bounds_min <- c(0, 0)
@@ -286,6 +300,7 @@ estimate_model <- function(dat, model) {
 models <- c(
   "Shared infiltration-only",
   "Confinement-varying infiltration-only",
+  "Both-sources-varying infiltration-only",
   "First-order age-dependent"
 )
 
