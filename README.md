@@ -123,3 +123,35 @@ The same six model variants are fitted and compared using matched five-fold cros
 - `plots/age_adjusted_river_prior_CV.png`
 
 **Interpret carefully:** Only site 2801 has MRT=0 in the current 29-well selection; the remaining MRTs are ≥1 year. The year-specific attenuation is an assumed travel-time response; MRT alone does not determine dispersion or attenuation. Piston flow would simply delay the sinusoid. The daily-mean variance split cannot be estimated from the 29 well DO measurements, and should be constrained by time-frequency analysis of the actual river record where possible. The age term still cannot distinguish infiltration loss from saturated-aquifer reaction. The code is supplied for execution in Positron; the equivalent numerical sensitivity was independently evaluated in Python, but this R script has not been run here.
+
+
+## Riverbed oxygen-loss sensitivity and infiltration-only bounds (script 07)
+
+Run after the three-tracer mixing model:
+
+```r
+source("scripts/01_three_tracer_mixing.R")
+source("scripts/07_infiltration_loss_sensitivity.R")
+```
+
+Script 07 tests the remaining major uncertainty in the apparent oxygen reduction rate: the river's monitoring DO (reference 7.5 mg/L) is **not** necessarily the DO entering the saturated aquifer after riverbed infiltration.
+
+- Fix riverbed oxygen loss at 0–7.5 mg/L in 0.25 mg/L increments; for each fixed loss refit effective rainfall-recharge DO (0–9.5 mg/L) and first-order age coefficient k. Repeat all fits **with and without** young, high-DO site 2801.
+- Use grouped five-fold CV (related Eastbourne, Gilbertson and Flaxmere wells together), reporting within-sample and held-out RMSE separately.
+- Independently calculate the *minimum* riverbed oxygen loss each well requires if **no loss occurs after infiltration**, allowing its rainfall-derived water to be entirely anoxic. This is an extremely favourable assumption for the infiltration-only explanation: oxygen in rainfall recharge would require yet more loss from the river component.
+- Repeat required-loss calculation for river references 5.6, 7.5 and 9.4 mg/L. Flag samples, notably site 2801 at 7.5 mg/L, whose DO exceeds the maximum implied by these fixed source bounds. A river sample can temporarily exceed its long-run mean; this is not evidence of oxygen production in the aquifer.
+- Compare physically bounded k=0 models with shared effective source DO or different effective river DO for confined versus unconfined wells, against an age-dependent model with river mean fixed at 7.5 mg/L.
+
+Output tables:
+- `outputs/infiltration_loss_profile.csv`
+- `outputs/infiltration_minimum_loss_per_well.csv`
+- `outputs/infiltration_required_loss_summary.csv`
+- `outputs/infiltration_model_CV_predictions.csv`
+- `outputs/infiltration_model_CV_summary.csv`
+
+Output figures:
+- `plots/infiltration_profile_CV.png`
+- `plots/infiltration_profile_k.png`
+- `plots/infiltration_minimum_loss_by_age.png`
+
+**Inference limit:** The minimum-loss calculation identifies what a no-aquifer-reduction explanation *requires*, not where consumption actually happened. The confinement model only tests a coarse proxy for variable infiltration conditions; no coordinates or independent infiltration DO observations are available. If initial DO is permitted to vary systematically with MRT, a sufficiently flexible infiltration-only model can be exactly equivalent to the first-order age model. The independent Python calculations provide numerical results; run the R script in Positron to verify its outputs. Raw groundwater data have not been committed.
