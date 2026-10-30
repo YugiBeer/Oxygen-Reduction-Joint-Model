@@ -6,6 +6,9 @@ setwd(here::here("Oxygen-Reduction-Joint-Model"))
 tracers <- c("O18", "Cl", "xs_Air")
 maximum_tracer_fraction_range <- 0.35
 
+# Intermediate result directory is created automatically.
+dir.create("outputs", showWarnings = FALSE, recursive = TRUE)
+
 dat <- read_csv(
   "data/groundwater.csv", show_col_types = FALSE,
   col_types = cols(Site_ID = col_character(), site = col_character(),
