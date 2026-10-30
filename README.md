@@ -357,3 +357,32 @@ A separate importance-weighting screen of the original posterior showed that dou
 **Mixing fraction insight:** On the 41-well prototype, switching from tracer-only to tracer+DO posterior mixing fractions shifted median fLSR by less than 0.001 at essentially every well (median absolute change about 0.00005). Thus the DO observations contribute almost no information about the mixing fractions in this model. The larger differences from the old 29-well three-tracer median mixing estimates reflect the changed tracer likelihood, estimated endmembers, and inclusion of excluded wells—not oxygen-data feedback. This is model-conditional.
 
 **Unresolved:** Posterior predictive error and cross-validation of the final joint model have **not** yet been established. The original tracer endmember centres come from the same study, and two-recharge-component mixing may be too simple. Conclusions about LSR-versus-aquifer DO reduction remain conditional on the assumed river DO, MRT prior, mixing structure and common age-associated k. Do not interpret a positive k as independent proof of saturated-aquifer oxygen loss.
+
+## Held-out DO validation: common versus variable LSR DO (script 14)
+
+**Decisive predictive test for the added LSR-DO spatial-variability parameter.**
+
+The joint Stan model now has a **has_DO** observation mask. This allows strictly holding out groundwater DO while retaining the independent chloride, δ18O, excess-air observations and reported MRT for the same wells. Script 12 passes has_DO=1 for all wells; script 14 sets has_DO=0 for the withheld wells AND overwrites their DO values with zeros before passing data to Stan. Excess N2 is excluded (use_n2=0) so no potentially reactive nitrogen information leaks into DO prediction.
+
+Run in Positron after CmdStan/Stan dependencies are installed:
+
+    source("scripts/14_joint_Bayesian_LSR_DO_grouped_CV.R")
+
+The two alternatives use identical priors and the exact same grouped five-fold splits (related Eastbourne, Gilbertson, Flaxmere and exact repeat Site_ID samples are kept together):
+
+- **Common effective LSR DO:** the global effective LSR DO parameter applies to all wells; prior Uniform(0,9.5 mg/L).
+- **Variable effective LSR DO:** each well has a logistic-normal source DO between 0 and 9.5 mg/L, controlled by a common central DO and hierarchical SD tau; prior on tau is HalfNormal(SD=1.5) on the logit scale. No site-specific DO values are fitted from held-out groundwater DO.
+
+Both models estimate source fractions and tracer end members jointly; reported MRT is mean-centered under an assumed log-normal error with log SD=0.25. The fit uses all **41 wells with usable DO and MRT**, not only the 29 that pass the old tracer-agreement screen. Posterior predicted mean DO is used for RMSE and MAE, with posterior predictive intervals for uncertainty calibration. Four-chain HMC diagnostics (Rhat, bulk ESS and divergences) are checked after every fit.
+
+Outputs (local only, gitignored):
+- outputs/joint_LSR_DO_CV_folds.csv
+- outputs/joint_LSR_DO_CV_predictions.csv
+- outputs/joint_LSR_DO_CV_convergence.csv
+- outputs/joint_LSR_DO_CV_summary.csv
+- outputs/joint_LSR_DO_CV_paired_errors.csv
+- plots/joint_LSR_DO_grouped_CV_predictions.png
+
+**Evidence standard:** an improvement must be greater than fold-to-fold and MCMC uncertainty, and not depend entirely on the assumed spatial-variability prior. On 41 wells, a small RMSE difference is not evidence of identified spatial LSR DO variation. Source-specific DO loss remains conditional on an assumed 9.5 mg/L LSR reference, an assumed 7.5 mg/L river DO reference, the source mixing structure, and the MRT prior.
+
+**Implementation status:** script 14 and the Stan observation-mask modification are committed, but R/Stan has not been executed here. An independent Python joint posterior integration/CV check is being used to assess expected predictive behavior; its results must not be represented as R/Stan output. Since the source end-member priors were derived partly from the same study, the validation conditions on those empirical prior centres and is not a fully independent external-tracer validation.
