@@ -88,7 +88,7 @@ is_endpoint <- (
 raw_f <- sapply(tracers, function(t) {
   (dat[[t]] - R[[t]]) / (L[[t]] - R[[t]])
 })
-clipped_f <- pmax(0, pmin(1, raw_f))
+clipped_f <- pmax(pmin(raw_f, 1), 0) # raw_f first preserves matrix dims
 colnames(raw_f) <- tracers
 colnames(clipped_f) <- tracers
 median_nonmissing <- function(x) {
