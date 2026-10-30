@@ -169,3 +169,42 @@ Output figures:
 - `plots/infiltration_minimum_loss_by_age.png`
 
 **Inference limit:** The minimum-deficit calculation identifies what a no-age-dependent-reduction explanation *requires*, not where oxygen consumption occurred. The confinement model is only a crude proxy for differences in recharge entry conditions; no independent recharge-entry DO measurements are available. If initial recharge DO is permitted to vary systematically with MRT, a sufficiently flexible recharge-entry-only model can be exactly equivalent to the first-order age model. The independent Python calculations provide numerical results; run the R script in Positron to verify its outputs. Raw groundwater data have not been committed.
+
+
+## Main comparison: aquifer-age effect vs LSR oxygen loss (script 08)
+
+**This is the preferred analysis of the central scientific question.** Script 07 explored river-recharge entry deficits, which are not the present focus. "Infiltration" refers only to the land-surface recharge pathway; **no riverbed loss is estimated in script 08**.
+
+Run in Positron after script 01:
+
+```r
+source("scripts/01_three_tracer_mixing.R")
+source("scripts/08_LSR_vs_aquifer_oxygen_loss.R")
+```
+
+The same 29 selected wells and three-tracer source fractions are used, with a repeat analysis omitting site 2801. Four models are compared:
+
+| Model | First-order groundwater-age effect | LSR oxygen loss |
+|---|---|---|
+| A | Estimated | Fixed at zero (effective LSR DO = 9.5 mg/L) |
+| B | Estimated | One fitted common LSR loss |
+| C | Estimated | Between-well variable LSR loss, hierarchically distributed |
+| D | Fixed k=0 | Between-well variable LSR loss as in C |
+
+LSR effective DO is restricted to **0–9.5 mg/L** in B/C/D. In C/D, site-specific LSR DO values come from a bounded logistic-normal source distribution, **integrated out**, rather than fitting one free loss parameter per observation. Model A/B give a fixed LSR DO for all wells. This tests whether the variable LSR hypothesis improves predictions without making the model automatically fit every well.
+
+The river monitoring reference is 7.5 mg/L. Its population mean has an **assumed** N(7.5, 0.7) prior. Source DO temporal variance is based on the ~1.9 mg/L SD of **daily means**, with age-dependent attenuation under an **assumed exponential groundwater travel-time distribution**, 25% assumed persistent variance and an additional assumed 1 mg/L diurnal SD. The true distribution and variance split are not independently known. Shared residual model-discrepancy SD has a half-normal scale of 1.5 mg/L; DO measurement uncertainty is assumed 0.2 mg/L. The fitted apparent rate k has a half-normal scale of 0.10 year⁻¹. Model C/D LSR spatial variability is governed by a half-normal prior on its logistic SD (scale 1.5). These are **analytical assumptions**, not measured variances or reaction rates.
+
+Script 08 fits four independently initialized Bayesian MCMC chains for each model, provides basic R-hat diagnostics, and compares posterior predictive distributions with grouped five-fold cross-validation (including obvious Eastbourne, Gilbertson and Flaxmere groups). The script generates:
+
+- `outputs/LSR_loss_posterior_summary.csv`
+- `outputs/LSR_loss_convergence.csv`
+- `outputs/LSR_loss_CV_predictions.csv`
+- `outputs/LSR_loss_CV_summary.csv`
+- `plots/LSR_loss_posterior_k.png`
+- `plots/LSR_loss_CV_predictions.png`
+- `plots/LSR_loss_CV_residuals.png`
+
+The model was also evaluated independently in Python; approximate five-fold Bayesian posterior predictive RMSEs using all 29 wells were 1.08 (A), 1.11 (B), 1.12 (C bounded), and 3.09 (D bounded) mg/L. These are **independent numerical checks** and should not be misrepresented as results of the R code; repeat the script in Positron to validate R performance. Small differences due to MCMC randomness are expected.
+
+**Key inference:** Adding mean or variable LSR oxygen loss does not improve held-out prediction under these assumptions, and inferred k remains around 0.07 year⁻¹. The LSR loss parameters are poorly constrained: only five wells are LSR-dominated. The fit does **not** uniquely identify where the age-related depletion occurred; age-correlated source/boundary variation and uncertainty in mixing fractions or MRT remain relevant alternatives. The model uses fixed source fractions and MRT point estimates. The logistic-normal quadrature is approximate. No private groundwater data are stored in this public repository.
