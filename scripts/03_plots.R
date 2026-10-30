@@ -194,6 +194,22 @@ rainfall_scale <- function() {
   )
 }
 
+# Turbo is used for the first-order residence-time plot so the two recharge
+# end members read directly as blue (river) and red (rainfall).
+rainfall_turbo_scale <- function() {
+  scale_colour_viridis_c(
+    option = "turbo",
+    begin = 0.1,
+    end = 0.9,
+    direction = 1,
+    limits = c(0, 1),
+    breaks = c(0, 0.25, 0.5, 0.75, 1),
+    labels = c("River", "25%", "50%", "75%", "Rainfall"),
+    name = "Rainfall contribution",
+    guide = guide_colourbar(barwidth = grid::unit(10, "cm"))
+  )
+}
+
 save_plot <- function(
   p, filename,
   width = cfg$figure_width,
@@ -284,30 +300,60 @@ age_data <- predictions %>%
     model == "combined"
   ) %>%
   mutate(
-    error = DO_observed - DO_predicted
+    error = DO_observed - DO_predicted,
+    observed_rate = DO_observed / DO_initial,
+    predicted_rate = DO_predicted / DO_initial
   )
+
+first_order_fit <- fits %>%
+  filter(
+    kinetic == "First order",
+    model == "combined"
+  )
+
+stopifnot(nrow(first_order_fit) == 1)
+
+first_order_rate <- first_order_fit$aquifer_rate[[1]]
+best_fit_curve <- tibble(
+  MRT = seq(0, max(age_data$MRT), length.out = 300),
+  fitted_rate = exp(-first_order_rate * MRT)
+)
+equation_label <- paste0(
+  "Best fit: DOsample / DOinitial = exp(-",
+  format(round(first_order_rate, 3), nsmall = 3),
+  " × MRT)"
+)
 
 p2 <- ggplot(age_data, aes(x = MRT)) +
   geom_segment(
     aes(
       xend = MRT,
-      y = DO_observed,
-      yend = DO_predicted
+      y = observed_rate,
+      yend = predicted_rate
     ),
     colour = colours$connector,
     linewidth = cfg$error_line_width
   ) +
+  geom_line(
+    data = best_fit_curve,
+    aes(x = MRT, y = fitted_rate),
+    colour = "black",
+    linewidth = 1.1,
+    inherit.aes = FALSE
+  ) +
   geom_point(
     aes(
-      y = DO_observed,
+      y = observed_rate,
       colour = rainfall_fraction
     ),
     size = cfg$point_size
   ) +
   geom_point(
-    aes(y = DO_predicted),
+    aes(
+      y = predicted_rate,
+      colour = rainfall_fraction
+    ),
     shape = 1,
-    colour = colours$predicted,
     size = cfg$open_point_size,
     stroke = cfg$line_width
   ) +
@@ -317,7 +363,7 @@ p2 <- ggplot(age_data, aes(x = MRT)) +
       abs(error) > cfg$label_threshold
     ),
     aes(
-      y = DO_observed,
+      y = observed_rate,
       label = site
     ),
     size = cfg$label_size,
@@ -325,18 +371,34 @@ p2 <- ggplot(age_data, aes(x = MRT)) +
     vjust = -0.8,
     check_overlap = TRUE
   ) +
-  rainfall_scale() +
+  annotate(
+    "text",
+    x = Inf,
+    y = Inf,
+    label = equation_label,
+    hjust = 1.05,
+    vjust = 1.5,
+    size = cfg$label_size,
+    colour = colours$text
+  ) +
+  rainfall_turbo_scale() +
   scale_x_continuous(limits = c(0, NA)) +
+  scale_y_log10() +
   labs(
-    title = "Groundwater DO versus residence time",
+    title = "Groundwater DO rate versus residence time",
     subtitle = "Combined first-order model",
     x = "Mean residence time (years)",
-    y = "Dissolved oxygen (mg/L)",
-    caption = paste(
-      "Filled circles: observed DO; open circles:",
-      "leave-one-well-out predictions.",
-      "Vertical lines show prediction errors.",
-      "Initial DO varies with recharge-source proportions."
+    y = expression(DO[sample] / DO[initial]),
+    caption = str_wrap(
+      paste(
+        "Filled circles: observed DO rate; open circles:",
+        "leave-one-well-out predictions.",
+        "Vertical lines show prediction errors.",
+        "The black curve is the full-data combined first-order best fit.",
+        "Initial DO varies with recharge-source proportions;",
+        "the y axis is logarithmic."
+      ),
+      width = 120
     )
   )
 

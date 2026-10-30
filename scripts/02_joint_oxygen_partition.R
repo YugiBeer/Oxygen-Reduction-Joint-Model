@@ -201,11 +201,14 @@ predictions <- purrr::map_dfr(seq_len(nrow(LOO_fits)), function(i) {
     held, fit$effective_rainfall_DO_mg_L,
     fit$aquifer_rate, fit$kinetic
   )
+  initial_DO <- held$fR * river_DO +
+    held$fP * fit$effective_rainfall_DO_mg_L
   tibble(
     Site_ID = held$Site_ID,
     site = held$site,
     MRT = held$MRT,
     rainfall_fraction = held$fP,
+    DO_initial = initial_DO,
     DO_observed = held$DO,
     kinetic = fit$kinetic,
     model = fit$model,
