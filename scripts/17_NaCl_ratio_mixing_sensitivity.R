@@ -92,7 +92,7 @@ raw_3 <- sapply(tracers, function(t) {
   (x[[t]] - R[[t]]) / (L[[t]] - R[[t]])
 })
 stopifnot(is.matrix(raw_3), nrow(raw_3) == nrow(x))
-clip <- function(a) pmax(0, pmin(1, a))
+clip <- function(a) pmax(pmin(a, 1), 0) # preserve matrix dim
 f_individual <- clip(raw_3)
 n_available <- rowSums(is.finite(raw_3))
 range_3 <- apply(raw_3, 1, function(z) {
