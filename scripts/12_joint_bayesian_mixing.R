@@ -27,6 +27,7 @@ cfg <- list(
   use_n2 = c(FALSE, TRUE),# xsN2 as an optional REACTIVE response
   default_gamma = FALSE,  # gamma alpha priors optional; see Stan model
   vary_lsr_do = FALSE,    # TRUE adds per-well hierarchical LSR DO
+  run_prior_sensitivity = TRUE, # adds 4 runs (computationally expensive)
   gamma_prior_median = 10,
   tracer_prior_scale = 1, # 2 doubles source-endmember uncertainty
   seed = 20261030L,
@@ -113,14 +114,26 @@ stan_data_base <- list(
   mrt_reported = as.numeric(d$MRT)
 )
 
-# Run the three main sensitivity scenarios, with same underlying
-# measurements and tracer priors. Other combinations can be added.
+# Run the original three scenarios and, if enabled, four additional
+# LSR / endmember prior sensitivity scenarios (7 Stan fits in total).
+# Setting run_prior_sensitivity = FALSE keeps only the original three.
 scenarios <- tribble(
-  ~scenario,       ~log_mrt_SD, ~use_n2,
-  "MRT025",         cfg$mrts[1], FALSE,
-  "MRT025_N2",      cfg$mrts[1], TRUE,
-  "MRT050",         cfg$mrts[2], FALSE
+  ~scenario,        ~log_mrt_SD, ~use_n2, ~tracer_scale,
+  ~lsr_prior_a, ~lsr_prior_b, ~vary_lsr_do,
+  "MRT025",           cfg$mrts[1], FALSE, 1, 1, 1, FALSE,
+  "MRT025_N2",        cfg$mrts[1], TRUE,  1, 1, 1, FALSE,
+  "MRT050",           cfg$mrts[2], FALSE, 1, 1, 1, FALSE
 )
+if (isTRUE(cfg$run_prior_sensitivity)) {
+  scenarios <- bind_rows(scenarios, tribble(
+    ~scenario,          ~log_mrt_SD, ~use_n2, ~tracer_scale,
+    ~lsr_prior_a, ~lsr_prior_b, ~vary_lsr_do,
+    "MRT025_wideTracer", cfg$mrts[1], FALSE, 2, 1, 1, FALSE,
+    "MRT025_LSRpoor",    cfg$mrts[1], FALSE, 1, 2, 5, FALSE,
+    "MRT025_LSRrich",    cfg$mrts[1], FALSE, 1, 5, 2, FALSE,
+    "MRT025_LSRvary",    cfg$mrts[1], FALSE, 1, 1, 1, TRUE
+  ))
+}
 
 model <- cmdstanr::cmdstan_model(
   cfg$stan_file,
@@ -143,9 +156,13 @@ for (i in seq_len(nrow(scenarios))) {
       log_mrt_SD = as.numeric(s$log_mrt_SD),
       use_n2 = as.integer(s$use_n2),
       use_gamma = as.integer(cfg$default_gamma),
-      vary_lsr_do = as.integer(cfg$vary_lsr_do),
+      vary_lsr_do = as.integer(s$vary_lsr_do),
       gamma_prior_median = cfg$gamma_prior_median,
-      tracer_prior_scale = cfg$tracer_prior_scale
+      tracer_prior_scale = as.numeric(
+        s$tracer_scale * cfg$tracer_prior_scale
+      ),
+      lsr_prior_a = as.numeric(s$lsr_prior_a),
+      lsr_prior_b = as.numeric(s$lsr_prior_b)
     )
   )
   fit <- model$sample(
