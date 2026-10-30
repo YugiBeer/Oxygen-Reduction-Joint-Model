@@ -453,3 +453,40 @@ The aggregate held-out log predictive score **conditional on MAP parameters** (h
 A separate independent custom Metropolis posterior attempt showed unsatisfactory chain mixing (early split-Rhat maxima ~1.13–1.40), so it has **NOT** been used to draw conclusions. R/Stan code has been structurally checked but **not compiled or executed** in this environment. Credible intervals, latent mixing fractions and posterior predictive comparisons must come from the compiled script 15 with acceptable Rhat, ESS, divergences and 95% predictive coverage.
 
 **Interpretation:** Present evidence does not justify adding an unconstrained chloride enrichment term to the current mixing model. However the strong δ18O/Cl/excess-air disagreement in several wells remains real. If model B/C fails to improve held-out prediction, investigate whether excess air behaves as a source tracer and/or whether a two-recharge-component model is inadequate rather than adding further uncertain source fractions. Do NOT update the oxygen reduction model with new fractions until this comparison has passed convergence and predictive checks.
+
+## Original CSV: other candidate tracers and pairwise mixing (script 16)
+
+**Source:** private original/prepared groundwater CSV (currently 43 records, 42 with reported MRT). Script 16 uses the private local `data/groundwater.csv` and needs no Stan installation. It compares the three possible two-tracer mixing estimates and the prediction of the omitted tracer, audits additional analytes, and assesses effects on the same set of screened wells in a simple first-order DO fit.
+
+Run:
+
+    source("scripts/16_pairwise_mixing_and_extra_tracer_screen.R")
+
+The fixed end members follow the original definition: river sample 2801; LSR endmember is the mean of sites 1032 and 4294 and the 108-m sample from HB Prison. Each individual tracer gives a raw fLSR, clipped to [0,1] when forming the pairwise mean. The omitted tracer is predicted without using that well's observed value in the fraction estimate. Scores are reported with and without the four endmember samples; **because endmembers are derived from the study dataset, this is not an independent or fully Bayesian CV**. For refitted Bayesian endmember models with masked tracer observations see script 15.
+
+**Independent fixed-endmember check of current 43-row prepared data:**
+
+| Tracers used | Predicted tracer | n | Held-out tracer RMSE | Excluding four endpoint samples |
+|---|---|---:|---:|---:|
+| δ18O + Cl | excess air | 41 | 0.894 (xs_Air units) | 0.909 |
+| δ18O + excess air | chloride | 41 | 11.82 mg/L | 12.29 mg/L |
+| Cl + excess air | δ18O | 41 | 0.415‰ | 0.432‰ |
+
+These RMSEs have different units and should not be compared as though commensurable. An alternative check used the **same 30 wells** that currently pass the three-tracer agreement QC (threshold 0.35). The fixed-endmember, conditional first-order k estimates are 0.0701 yr^-1 (three-tracer median), 0.0714 (Cl+air), 0.0674 (δ18O+air), and 0.0673 (δ18O+Cl). Corresponding effective LSR DO estimates are 8.46, 9.03, 7.46 and 7.42 mg/L. This reiterates that the apparent age association is comparatively robust while the LSR DO deficit is not.
+
+**Other analytes:** the raw/prepared file contains 20 negative-valued H2 results, very likely stable hydrogen isotope δ²H rather than dissolved H2, but metadata/units must be verified and the river endpoint is absent. δ²H and δ18O have Pearson r=0.945 in the 20 paired records, so both may help diagnose recharge provenance and evaporation but are not automatically independent mixing constraints. Sodium (n=42) correlates very strongly with chloride (r=0.975), and both electrical conductivity columns are largely redundant with other ions. Mg, Ca, sulfate, K and silica may help evaluate water-rock reaction or source-dependent solute composition, but cannot simply be treated as conservative. Nitrate, Fe, Mn, NH3, methane and **excess N2** should remain distinct reactive/redox variables at this stage. The existing categorical `source` field labels 28 samples as rain, 14 as river and one as missing; the classification is **not independent ground truth** until its provenance is established.
+
+**Sample-count warning:** older scripts assume 42 input records and 29 selected wells. The currently inspected prepared file contains 43 records, 41 with all three mixing tracers, and 30 passing the previous QC. Its missing-MRT sample is Frimley (also missing chloride). Keep track of data version before directly comparing fitted results; do not silently interpret a changed sample selection as a model improvement.
+
+Local gitignored outputs:
+- `outputs/mixing_pairwise_endmembers.csv`
+- `outputs/mixing_pairwise_all_fractions.csv`
+- `outputs/mixing_pairwise_predictions.csv`
+- `outputs/mixing_pairwise_scores.csv`
+- `outputs/mixing_pairwise_effect_on_DO_model.csv`
+- `outputs/mixing_additional_tracer_screen.csv`
+- `outputs/mixing_source_label_comparison.csv`
+- `plots/mixing_pairwise_predict_third_tracer.png`
+- `plots/mixing_pairwise_source_fraction_disagreement.png`
+
+**Next priority:** establish whether xs_Air behaves as a conservative mixing tracer and whether variable δ18O endmembers improve predictions after full Bayesian model-15 convergence; don't add sodium, δ²H, conductivity, sulfate or redox indicators to the mixing likelihood without independent physical justification and suitable endmember data.
