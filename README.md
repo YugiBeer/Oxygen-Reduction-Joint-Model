@@ -752,3 +752,58 @@ A private regularized nonlinear least-squares screening fit used **fixed no-air 
 The coupled versions do NOT materially improve DO or progress prediction. For the **no-air 40-well dataset**, Spearman correlations of measured progress are **DO r_s≈−0.003**, **reported MRT r_s≈−0.122**, **tracer-only fLSR r_s≈−0.686**, **NO3N r_s≈−0.832**. The very strong negative association with remaining nitrate is particularly important because nitrate occurs **in the denominator of progress**. This does NOT imply the groundwater underwent proportionally more denitrification where nitrate was initially low; it may simply reflect the fractional definition and differences in recharge nitrate supply.
 
 **Validation status:** Code added and structural syntax checks performed. This environment lacks R/CmdStan, so the joint Stan model has **not** been compiled or executed. Bayesian posterior interval and grouped-CV scores must be obtained in Positron. Only consider a DO-process improvement if fully joint fits have acceptable Rhat/ESS/divergences and improve held-out outcomes without substantially relying on the inferred progress response denominator.
+
+
+## Final DO formulation — ZERO versus FIRST order aquifer loss (script 23, corrected 31 October 2026)
+
+**This section supersedes any earlier script-23 descriptions of first- versus second-order models.** The intended competing aquifer kinetics are **zero-order** and **first-order**. The old second-order aquifer model is not a candidate in this final comparison.
+
+Files:
+- `stan/23_final_DO_two_pathway_kinetics.stan`
+- `scripts/23_final_DO_two_pathway_kinetics.R`
+
+### Fixed physical boundary conditions
+
+| Location | DO boundary | Treatment |
+|---|---|---|
+| Rainfall at land surface | Atmospheric saturation concentration `Csat(T_recharge,P)` | Fixed for a given scenario; default T=15°C and relative pressure=1, approximate saturation polynomial; must test plausible recharge T and elevation |
+| LSR at water table | `C_LSR,WT = Csat * survival_LSR` | Posterior survival constrained to 0–1, with a Beta(1,1) baseline prior |
+| River recharge at aquifer entry | **7.5 mg/L** | **FIXED boundary value** in primary model, not inferred from river-well DO |
+| River-dominated groundwater site 2801 | **7.5 mg/L in modelling input only** | The original measured 10.2 mg/L is kept in the original private CSV. The assigned 7.5 is **excluded from the DO likelihood and CV**; using this pseudo-observation as independent evidence would be circular. Site 2801 can still contribute measured geochemical mixing tracers. |
+| Aquifer DO loss | Competing zero- or first-order loss | Joint posterior reaction coefficient with reported groundwater MRT uncertainty |
+
+Do not conflate rainfall DO saturation at the land surface with **effective LSR DO at the water table**. The LSR DO deficit between them is estimated. No vadose-zone reaction-time measurement exists in these data.
+
+**Competing aquifer kinetics**, applied separately to the two recharge-source components before they are mixed at the sampled well; same effective reported aquifer MRT is assumed for both:
+
+- **Zero-order:** `C(t)=max(0,C_entry-k0*t)`, `k0` in **mg/L/year**, clipped at physical depletion.
+- **First-order:** `C(t)=C_entry*exp(-k1*t)`, `k1` in **year^-1**.
+
+In both model fits, the sampler estimates a shared scaled parameter `k_ref` and assigns the same half-normal prior centered at zero with scale 0.15 year^-1 on the **initial fractional depletion rate at reference C_ref=7.5 mg/L**. For zero-order, `k0=k_ref*C_ref`; for first-order, `k1=k_ref`. This matches the reference-relative prior scale without pretending the rate constants have the same physical units. The posterior variable **`aquifer_rate_actual`** and its accompanying R column **`kinetic_rate_units`** report only the active model's rate, avoiding spurious zero estimates for the alternative order.
+
+**LSR loss:** The model directly estimates the water-table DO deficit `Csat-C_LSR,WT` in mg/L and its posterior interval. A separate unsaturated-zone **rate constant is not identifiable without vadose transit time**. The R script therefore exports conditional, explicitly ASSUMPTION-DEPENDENT rates for travel times 0.25, 1 and 5 years:
+
+- **Zero-order conditional LSR rate:** `k0_LSR=(Csat-C_LSR,WT)/t_vadose` [mg/L/year].
+- **First-order conditional LSR rate:** `k1_LSR=-ln(C_LSR,WT/Csat)/t_vadose` [year^-1].
+
+They are algebraic transforms of exactly the SAME posterior water-table DO and are **not independently selected kinetic orders**.
+
+The conservative source-fraction likelihood uses δ18O, chloride and sodium, with a joint correlated Na–Cl error term and variable LSR δ18O source composition. Excess air is excluded by default after the preceding ablation analysis, but can be enabled for sensitivity. Excess N₂ and reaction progress are not inserted as additional DO-loss constraints because they did not improve paired held-out DO prediction. Study-wide outlier 16758 is excluded by the user's explicit decision. Of the 42 remaining samples, 41 have measured DO+MRT; after masking assigned 2801 DO, **40 independent DO observations** enter the fitting likelihood. Reported groundwater MRTs are assumed to approximate the aquifer travel time and are uncertain; this boundary interpretation must be revisited if they include unsaturated travel.
+
+**Run** with local private `data/Uwe_HP_data_prepared.csv`, CmdStanR and CmdStan:
+
+```r
+source("scripts/23_final_DO_two_pathway_kinetics.R")
+```
+
+It runs two full-data models (aq_order 0 and 1) and five matched grouped DO CV folds for each order (12 Stan fits total). `cfg$run_only_fold=1L` provides a smoke test; `cfg$run_CV=FALSE` runs the two full fits only. `cfg$run_prior_sensitivity=TRUE` runs additional full fits varying rainfall saturation temperature, **fixed river boundary in explicit alternative scenarios**, MRT uncertainty and LSR prior. The **main** fixed river boundary remains 7.5 mg/L.
+
+Local, gitignored results:
+- `outputs/final_DO_23_boundary_conditions.csv` — authoritative boundary-condition audit
+- `outputs/final_DO_23_global_posteriors.csv` — aquifer rate by correct physical units, LSR survival and DO deficit, other source/posterior quantities
+- `outputs/final_DO_23_conditional_LSR_rates.csv` — prior-time-conditional *zero* and *first* LSR rates, not uniquely inferred
+- `outputs/final_DO_23_cv_scores.csv`, `outputs/final_DO_23_cv_paired_errors.csv`, `outputs/final_DO_23_cv_predictions.csv`
+- `outputs/final_DO_23_full_diagnostics.csv`, `outputs/final_DO_23_cv_diagnostics.csv`, site-specific posteriors and posterior RDS files
+- `plots/final_DO_23_posteriors.png`, `plots/final_DO_23_cv.png`
+
+**Limitations:** Source fractions, MRT, LSR entry DO and aquifer k are estimated jointly and may compensate for one another. The shared source-specific travel-time and independent source-attenuation-before-mixing assumptions are a useful effective description, not a resolved transport history. The zero-order truncation has a nondifferentiable zero crossing and may require careful NUTS diagnostics. Summarized DO losses are arithmetic averages across sampled wells, NOT flux-weighted catchment or aquifer budgets. The two aquifer reaction orders must be compared on matched held-out DO RMSE/MAE and predictive coverage, not posterior rate magnitudes (units differ). **The corrected Stan/R workflows were statically checked but have not yet been compiled or sampled in R; do not quote posterior rate estimates until convergence is verified.**
