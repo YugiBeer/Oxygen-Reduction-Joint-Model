@@ -294,7 +294,7 @@ if (cfg$run_CV) {
       set.seed(cfg$seed+fold+100*use_na)
       pp <- vapply(vars,function(v) {
         draws[,v]+rnorm(nrow(draws),
-          sd=sqrt(square(draws[,"sigma_DO"])+.2^2))
+          sd=sqrt(draws[,"sigma_DO"]^2+.2^2))
       },numeric(nrow(draws)))
       if (is.null(dim(pp))) pp <- matrix(pp,ncol=1)
       cv_preds[[length(cv_preds)+1L]] <- tibble(
