@@ -404,3 +404,52 @@ The full-data overall RMSE difference is only **−0.0024 mg/L** (variable minus
 **MCMC qualification:** Three independent Python chains per fold/model were run with 850 warmup and 1000 retained draws. Two problematic fits were rerun with four chains, 1650 warmup and 1750 retained draws. Maximum basic split-Rhat after these reruns was 1.056 (variable-LSR model, one fold); the remaining 9 fits were at most 1.035. Split-Rhat alone is not a full effective-sample-size or convergence assessment. All numbers above come from **Python, not a compiled/executed R/Stan model**. The R/Stan code in script 14 is provided for a separately reproducible validation and may yield slightly different results.
 
 **Interpretation:** This does not prove spatial variation in LSR oxygen loss is absent. Rather, with only five strongly LSR-dominated wells, the larger model provides no observed improvement in out-of-sample DO prediction under the current tracer mixing structure, river and LSR DO priors, and MRT uncertainty assumptions. Do not use its extra parameters to claim an identified LSR-versus-aquifer oxygen-loss split. Endmember prior centres remain partly empirical from the same study.
+
+
+## Tracer-only Bayesian mixing-model validation (script 15; 31 Oct 2026)
+
+**Scientific rationale:** Before interpreting LSR versus groundwater-age DO reduction, establish how well a two-source model can predict the three measured, nominally conservative tracers. DO, groundwater MRT, nitrate and **excess N2** are deliberately excluded from this comparison. The third mixing tracer is **excess air (xs_Air)**, not excess N2. Excess air itself may reflect gas exchange and recharge physics, and its use as a conservative mixing tracer is a hypothesis being tested.
+
+**Three candidate models fit the same source-fraction and endmember priors:**
+- **A: common end members:** Two sources with one global river and one global LSR value for each tracer, plus study-level tracer residual SDs. This provides a normal-likelihood reference for the earlier two-endmember model; it is not mathematically identical to the earlier robust Student-t mixing likelihood.
+- **B: variable LSR isotope signature:** Add a half-normal-prior between-well SD for the LSR **δ18O** source value. The LSR isotope random effect is analytically integrated into the δ18O likelihood, contributing `(fLSR*tau_O18)^2` to variance; no site-specific isotope measurement is fabricated.
+- **C: variable LSR δ18O plus nonnegative chloride enrichment:** Adds an independent half-normal chloride concentration term with unknown population scale. It is analytically integrated using a skew-normal likelihood. This is an empirical mixing-model discrepancy term, **not proof of anthropogenic contamination**.
+
+Source-endmember priors are centred on study-derived endmember samples and have finite SDs. These empirical prior centres are not independent field measurements. The script exposes `cfg$endmember_prior_scale` to widen all such priors; compare scale 1 versus 2 before interpretation.
+
+**Stan and R files:**
+- `stan/15_tracer_only_mixing_models.stan`
+- `scripts/15_tracer_only_mixing_CV.R`
+
+Run in Positron with CmdStanR, CmdStan, tidyverse, posterior and here already installed:
+
+```r
+source("scripts/15_tracer_only_mixing_CV.R")
+```
+
+**Predictive design:** Every sample retains at least two observed tracers. Across THREE reproducible, balanced and group-aware validation rotations, EACH observed chloride, δ18O and excess-air concentration is withheld exactly once. Each posterior fit has only that site's other measured tracers available to infer the source fraction. The held-out value is masked in the likelihood **and overwritten with zero in the Stan data**. All three mixing models use the SAME masks; this evaluates actual tracer prediction instead of in-sample flexibility. Group-aware masks keep Eastbourne/Gilbertson/Flaxmere repeats together. No groundwater DO is supplied to the model.
+
+The script performs 9 four-chain Stan validation fits, optionally followed by 3 all-data fits for per-well fLSR posterior intervals, saving local gitignored files:
+- `outputs/tracer_only_CV_masks.csv`
+- `outputs/tracer_only_CV_predictions.csv`
+- `outputs/tracer_only_CV_scores_by_tracer.csv`
+- `outputs/tracer_only_CV_scores_overall.csv`
+- `outputs/tracer_only_CV_convergence.csv`
+- `outputs/tracer_only_model_source_fractions.csv`
+- `outputs/tracer_only_model_endmembers.csv`
+- `plots/tracer_only_heldout_predictions.png`
+- `plots/tracer_only_normalised_CV_error.png`
+
+**Independent preliminary screening, NOT a converged Bayesian result:** A separate SciPy *maximum-a-posteriori* calculation with source fractions numerically marginalized under a uniform prior was run on 42 private records, with 124 withheld tracer measurements. It used the same three structural alternatives and matched 3-rotation observation masks; its normal error model is deliberately simple. The held-out point-prediction RMSEs were:
+
+| Tracer | A common | B variable δ18O | C plus Cl enrichment |
+|---|---:|---:|---:|
+| Chloride (mg/L, 41 observations) | 12.27 | 10.66 | 10.66 |
+| δ18O (‰, 41 observations) | 0.389 | 0.385 | 0.385 |
+| Excess air (original units, 42 observations) | **1.177** | 1.209 | 1.209 |
+
+The aggregate held-out log predictive score **conditional on MAP parameters** (higher is better) was A **−279.52**, B **−281.58**, C **−281.58**; differences around 2 log-score units over 124 observations are not decisive. For this particular screen, fitted positive chloride enrichment approached zero, and B/C gave almost indistinguishable predictions. Variable LSR δ18O modestly improved Cl while worsening excess-air prediction. Endmember estimates shifted appreciably between masking rotations, highlighting weak identification. **Do not report these MAP values as Stan posterior or as validated Bayesian CV.**
+
+A separate independent custom Metropolis posterior attempt showed unsatisfactory chain mixing (early split-Rhat maxima ~1.13–1.40), so it has **NOT** been used to draw conclusions. R/Stan code has been structurally checked but **not compiled or executed** in this environment. Credible intervals, latent mixing fractions and posterior predictive comparisons must come from the compiled script 15 with acceptable Rhat, ESS, divergences and 95% predictive coverage.
+
+**Interpretation:** Present evidence does not justify adding an unconstrained chloride enrichment term to the current mixing model. However the strong δ18O/Cl/excess-air disagreement in several wells remains real. If model B/C fails to improve held-out prediction, investigate whether excess air behaves as a source tracer and/or whether a two-recharge-component model is inadequate rather than adding further uncertain source fractions. Do NOT update the oxygen reduction model with new fractions until this comparison has passed convergence and predictive checks.
