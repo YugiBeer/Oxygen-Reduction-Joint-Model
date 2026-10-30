@@ -313,7 +313,7 @@ fit_chains <- function(data, model, n_chains, warmup,
   })
   list(
     summary = bind_rows(map(chains, "summary")),
-    z = unlist(map(chains, "z"), recursive = FALSE)
+    z = purrr::flatten(map(chains, "z"))
   )
 }
 
