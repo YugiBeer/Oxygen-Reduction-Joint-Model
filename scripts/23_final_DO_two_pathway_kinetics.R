@@ -68,7 +68,7 @@ cfg <- list(
   min_bulk_ESS=400,
   run_CV=TRUE,                # 2 full and 10 paired grouped CV fits
   run_only_fold=NULL,        # 1L for smoke test, else NULL
-  run_prior_sensitivity=FALSE, # full fits for selected BC/priors
+  run_prior_sensitivity=TRUE,  # full fits for selected BC/priors
   save_fits=TRUE
 )
 
@@ -281,6 +281,7 @@ sample_model <- function(order,x=stan_data,fold=0L,scenario=0L) {
   )
 }
 post <- list();diag <- list();wells <- list();conditional <- list()
+identifiability <- list();joint_draws <- list()
 for (order in 0:1) {
   message("FULL JOINT FIT aquifer reaction ORDER ",order,
           if (order==0) " (zero-order)" else " (first-order)")
@@ -296,6 +297,50 @@ for (order in 0:1) {
       .before=1
     )
   diag[[order+1L]] <- select_diag(fit,order)
+  # Examine the JOINT posterior trade-off rather than only
+  # marginal credible intervals for the two depletion processes.
+  latent <- posterior::as_draws_matrix(fit$draws(variables=c(
+    "LSR_DO_deficit","aquifer_rate_actual","survival_LSR",
+    "mean_vadose_LSR_DO_loss","mean_aquifer_DO_loss"
+  )))
+  loss <- latent[,"LSR_DO_deficit"]
+  rate <- latent[,"aquifer_rate_actual"]
+  sv <- latent[,"survival_LSR"]
+  vadose_loss <- latent[,"mean_vadose_LSR_DO_loss"]
+  aq_loss <- latent[,"mean_aquifer_DO_loss"]
+  # Beta(a,b) prior SD of the assumed LSR survival fraction.
+  a <- cfg$survival_prior_a
+  b <- cfg$survival_prior_b
+  prior_sd <- Csat*sqrt(a*b/((a+b)^2*(a+b+1)))
+  identifiability[[order+1L]] <- tibble(
+    aquifer_order=order,
+    kinetic_rate_units=if(order==0) "mg/L/year" else "year^-1",
+    n_posterior_draws=length(loss),
+    pearson_deficit_rate=cor(loss,rate),
+    spearman_deficit_rate=cor(loss,rate,method="spearman"),
+    pearson_vadose_aquifer_loss=cor(vadose_loss,aq_loss),
+    posterior_LSR_deficit_sd=sd(loss),
+    prior_LSR_deficit_sd=prior_sd,
+    posterior_to_prior_LSR_sd=sd(loss)/prior_sd,
+    Pr_LSR_deficit_gt_2=mean(loss>2),
+    Pr_LSR_deficit_gt_5=mean(loss>5),
+    Pr_LSR_WT_DO_lt_2=mean(Csat*sv<2),
+    Pr_vadose_loss_gt_aquifer_loss=mean(vadose_loss>aq_loss)
+  )
+  set.seed(cfg$seed+order)
+  keep <- sample(seq_along(loss),min(length(loss),3500L))
+  joint_draws[[order+1L]] <- tibble(
+    aquifer_order=order,
+    LSR_DO_deficit_mg_L=loss[keep],
+    aquifer_rate=rate[keep],
+    vadose_loss_mg_L=vadose_loss[keep],
+    aquifer_loss_mg_L=aq_loss[keep],
+    rate_units=if(order==0) "mg/L/year" else "year^-1"
+  )
+  write_csv(bind_rows(identifiability),
+            "outputs/final_DO_23_identifiability_summary.csv")
+  write_csv(bind_rows(joint_draws),
+            "outputs/final_DO_23_joint_posterior_draws.csv")
   w <- fit$summary(variables=c(
     "f_LSR","true_MRT","mean_DO",
     "vadose_LSR_DO_loss","aquifer_DO_loss",
@@ -356,6 +401,29 @@ for (order in 0:1) {
 }
 main <- bind_rows(post)
 write_csv(main,"outputs/final_DO_23_global_posteriors.csv")
+p_joint <- bind_rows(joint_draws) %>%
+  ggplot(aes(LSR_DO_deficit_mg_L,aquifer_rate))+
+  geom_point(alpha=.12,size=.65)+
+  geom_smooth(method="loess",se=FALSE,colour="black",
+              linewidth=.7)+
+  facet_wrap(
+    ~aquifer_order,scales="free_y",
+    labeller=as_labeller(c(
+      "0"="Zero order (mg/L/year)",
+      "1"="First order (year^-1)"
+    ))
+  )+
+  labs(
+    title="LSR deficit versus aquifer rate: joint posterior",
+    subtitle="Strong trade-off indicates weak parameter identifiability",
+    x="LSR oxygen deficit, rainfall to water table (mg/L)",
+    y="Aquifer reaction coefficient"
+  )+theme_bw(base_size=12)
+print(p_joint)
+ggsave("plots/final_DO_23_identifiability.png",p_joint,
+       width=11,height=5.5,dpi=300)
+cat("\nJOINT POSTERIOR IDENTIFIABILITY:\n")
+print(bind_rows(identifiability),n=Inf)
 
 # Five GROUPED folds; 2801 is only a source/boundary proxy, never
 # a held-out DO target. Group labels and fold membership identical
@@ -412,6 +480,7 @@ if (cfg$run_CV) {
         fold=fold,
         sample_index=held,
         Site_ID=d$Site_ID[held],
+        cv_group=d$cv_group[held],
         Depth=d$Depth[held],
         observed_DO=d$DO[held],
         predicted_DO=as.numeric(predmean),
@@ -446,7 +515,7 @@ if (cfg$run_CV) {
   write_csv(scores,"outputs/final_DO_23_cv_scores.csv")
   paired <- preds %>%
     select(
-      sample_index,Site_ID,Depth,fold,
+      sample_index,Site_ID,cv_group,Depth,fold,
       observed_DO,aquifer_order,predicted_DO
     ) %>%
     pivot_wider(
@@ -461,6 +530,46 @@ if (cfg$run_CV) {
         abs_error_first-abs_error_zero
     )
   write_csv(paired,"outputs/final_DO_23_cv_paired_errors.csv")
+  # Matched bootstrap at original sampling GROUP level. This
+  # assesses heterogeneity of predictive differences, NOT MCMC
+  # posterior probability of which kinetic order is true.
+  grouped_paired <- split(paired,paired$cv_group)
+  set.seed(cfg$seed+920L)
+  boot <- map_dfr(seq_len(2000L),function(b) {
+    draw <- sample(
+      seq_along(grouped_paired),
+      length(grouped_paired),replace=TRUE
+    )
+    dx <- bind_rows(grouped_paired[draw])
+    tibble(
+      iteration=b,
+      RMSE_zero=sqrt(mean((dx$order_0-dx$observed_DO)^2)),
+      RMSE_first=sqrt(mean((dx$order_1-dx$observed_DO)^2)),
+      MAE_zero=mean(abs(dx$order_0-dx$observed_DO)),
+      MAE_first=mean(abs(dx$order_1-dx$observed_DO))
+    )
+  ) %>% mutate(
+    first_minus_zero_RMSE=RMSE_first-RMSE_zero,
+    first_minus_zero_MAE=MAE_first-MAE_zero
+  )
+  write_csv(boot,"outputs/final_DO_23_cv_bootstrap.csv")
+  boot_summary <- tibble(
+    metric=c("first_minus_zero_RMSE","first_minus_zero_MAE"),
+    mean=c(mean(boot$first_minus_zero_RMSE),
+           mean(boot$first_minus_zero_MAE)),
+    lower95=c(unname(quantile(boot$first_minus_zero_RMSE,.025)),
+              unname(quantile(boot$first_minus_zero_MAE,.025))),
+    upper95=c(unname(quantile(boot$first_minus_zero_RMSE,.975)),
+              unname(quantile(boot$first_minus_zero_MAE,.975))),
+    fraction_resamples_first_better=c(
+      mean(boot$first_minus_zero_RMSE<0),
+      mean(boot$first_minus_zero_MAE<0)
+    )
+  )
+  write_csv(boot_summary,
+            "outputs/final_DO_23_cv_bootstrap_summary.csv")
+  cat("\nMATCHED GROUP-BOOTSTRAP CV DIFFERENCES:\n")
+  print(boot_summary,n=Inf)
   cat("\nPAIRED GROUPED HELD-OUT DO SCORES:\n")
   print(scores,n=Inf)
   p <- preds %>%
