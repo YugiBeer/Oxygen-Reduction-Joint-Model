@@ -47,6 +47,7 @@ cfg <- list(
   endmember_prior_scale = 1,
   lsr_do_prior_a = 1, lsr_do_prior_b = 1,
   low_DO_threshold = 2,        # mg/L, sensitivity: 1, 2, 3
+  include_excess_air = TRUE,   # FALSE omits excess air MIXING likelihood
   exclude_16758 = FALSE,      # recommended sensitivity rerun
   nfolds = 5L,
   run_CV = TRUE,
@@ -57,6 +58,11 @@ cfg <- list(
   adapt_delta = .98, max_treedepth = 13L,
   max_rhat = 1.05, min_ess_bulk = 400,
   save_fits = TRUE
+)
+# Optional per-run overrides permit reproducible paired ablation
+# through script 21 without editing this script between fits.
+cfg <- utils::modifyList(
+  cfg,getOption("oxygen.paired.cfg.override",list())
 )
 if (!requireNamespace("cmdstanr",quietly=TRUE) ||
     !requireNamespace("posterior",quietly=TRUE))
@@ -137,6 +143,14 @@ base <- list(
   lsr_do_prior_b=cfg$lsr_do_prior_b,
   low_DO_threshold=cfg$low_DO_threshold
 )
+# If excluded, xs_Air contributes NO information about source fLSR.
+# It does not enter the DO equation directly. xs_N2 remains the
+# reported corrected excess-N2 measurement in both variants.
+if (!isTRUE(cfg$include_excess_air)) {
+  base$has_air[] <- 0L
+  base$air[] <- 0
+}
+message("Excess air in mixing likelihood: ",cfg$include_excess_air)
 
 models <- tribble(
   ~label,             ~use_n2, ~n2_link,
@@ -210,7 +224,8 @@ diagnostic <- function(fit,spec,fold=0L,held=NULL) {
 suffix <- paste0(
   "_N",nrow(d),
   if (cfg$exclude_16758) "_without16758" else "",
-  "_threshold",cfg$low_DO_threshold
+  "_threshold",cfg$low_DO_threshold,
+  if (isTRUE(cfg$include_excess_air)) "_withair" else "_noair"
 )
 to_file <- function(prefix) paste0("outputs/",prefix,suffix,".csv")
 
@@ -413,6 +428,7 @@ print(global %>% filter(variable %in% c(
 )),n=Inf)
 cat(
   "\nSCIENCE AND VALIDATION NOTES:\n",
+  "* Excess air included in mixing: ",cfg$include_excess_air,".\n",
   "* Excess N2 is a reactive outcome, NOT an O2-loss measurement.\n",
   "* Denitrification consumes nitrate as electron acceptor; it\n",
   "  generally follows O2 depletion rather than consuming O2.\n",
