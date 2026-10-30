@@ -593,7 +593,7 @@ if (cfg$run_CV) {
       MAE_zero=mean(abs(dx$order_0-dx$observed_DO)),
       MAE_first=mean(abs(dx$order_1-dx$observed_DO))
     )
-  ) %>% mutate(
+  }) %>% mutate(
     first_minus_zero_RMSE=RMSE_first-RMSE_zero,
     first_minus_zero_MAE=MAE_first-MAE_zero
   )
