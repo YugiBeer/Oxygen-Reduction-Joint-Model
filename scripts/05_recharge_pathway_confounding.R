@@ -250,7 +250,7 @@ posterior_summary <- function(draws, model) {
 # Full posterior estimates
 # ----------------------------------------------------------------------
 posterior <- map(model_specs$model, function(model) {
-  spec <- model_specs %>% filter(.data$model == model)
+  spec <- model_specs %>% filter(.data$model == .env$model)
   cat("Posterior:", model, "\n")
   sample_model(
     d, spec$pathway, spec$age_term,
