@@ -229,3 +229,27 @@ source("scripts/09_LSR_mixing_residual_diagnostics.R")
 Outputs are `outputs/LSR_mixing_residuals_by_well.csv`, `outputs/LSR_mixing_residual_correlations.csv`, `outputs/LSR_mixing_alternative_tracers.csv` and optionally `outputs/LSR_mixing_residual_spatial_test.csv`. Plots are `plots/LSR_mixing_abs_residual_vs_LSR.png`, `plots/LSR_mixing_abs_residual_vs_tracer_disagreement.png` and `plots/LSR_mixing_possible_DO_by_well.png`.
 
 **Independent Python diagnostic of the 29-well dataset:** Spearman correlations between absolute LOOWO DO error and LSR fraction -0.19 (p=0.32), and with intertracer disagreement -0.13 (p=0.51). Under the fitted fixed river DO and k, independently variable LSR entry DO within 0–9.5 mg/L can match only 6 of 29 observations. Refitting using individual tracers gives k about 0.0656–0.0716 yr^-1, but effective LSR DO 6.74–9.17 mg/L. This demonstrates uncertainty in the LSR DO-loss partition even though changing mixing fractions does not improve predictive DO RMSE. None of these results proves that the first-order rate belongs solely to saturated-aquifer reaction. The R script needs its first execution in Positron.
+
+## Groundwater age-distribution sensitivity (script 10)
+
+This tests the limitation of assigning one water age to every well based on its reported mean residence time (MRT). **We must first establish how MRT was estimated from the original age tracers before any particular age-distribution shape is interpreted physically.**
+
+Run in Positron, in sequence:
+
+    source("scripts/01_three_tracer_mixing.R")
+    source("scripts/10_groundwater_age_distribution_sensitivity.R")
+
+For the piston model the DO attenuation is exp(-k*MRT). For a gamma groundwater age distribution with **fixed** shape alpha and mean MRT, the integrated attenuation is (1+k*MRT/alpha)^(-alpha). Shape alpha=1 is an exponential age distribution; alpha approaching infinity is the piston limit. The coefficient of variation of groundwater ages is 1/sqrt(alpha).
+
+Script 10 compares alpha = Inf, 100, 50, 20, 10, 5, 3, 2, 1. For each shape it refits effective LSR entry DO within 0–9.5 mg/L and a common apparent first-order coefficient k. The river reference is held at 7.5 mg/L; no river-recharge deficit is estimated. The test uses **bounded least squares without new Bayesian priors**. Source fractions, reported MRT and river DO are treated as fixed. The same grouped five-fold CV splits are applied across shapes, and all fits repeat without site 2801.
+
+Files generated:
+- outputs/groundwater_age_distribution_sensitivity.csv
+- outputs/groundwater_age_distribution_CV_predictions.csv
+- plots/groundwater_age_distribution_CV.png
+- plots/groundwater_age_distribution_k.png
+- plots/groundwater_age_distribution_residuals.png
+
+**Independent Python check (all 29 wells, grouped CV):** Piston k=0.0701 yr^-1, RMSE 1.001 mg/L; gamma shape 10 k=0.0761, RMSE 1.005; shape 5 k=0.0824, RMSE 1.014; shape 2 k=0.1038, RMSE 1.065; exponential shape 1 k=0.1491, RMSE 1.192. **The Python and R randomized group folds are not identical**, so do not present the Python numbers as output from executing the R script.
+
+**Interpretation:** Wider age distributions increase the fitted apparent reduction coefficient but do not improve predictive DO accuracy. This does not establish that the age distribution is piston flow or that oxygen consumption occurs exclusively in the saturated aquifer. The river-derived and LSR components may have different age distributions, and the reported MRT could already be conditional on a specific lumped-parameter model. Age-tracer dating details and uncertainty are needed before introducing Bayesian priors on age-distribution shape.
