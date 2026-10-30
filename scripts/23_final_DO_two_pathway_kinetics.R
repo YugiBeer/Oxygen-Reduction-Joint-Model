@@ -1,20 +1,20 @@
 # 23_final_DO_two_pathway_kinetics.R
 #
-# FINAL PRIMARY BAYESIAN MODEL: aquifer first/second-order DO kinetics
+# FINAL PRIMARY BAYESIAN MODEL: aquifer zero/first-order DO kinetics
 # and pre-water-table LSR oxygen deficit from assumed saturated rainfall.
 #
 # PHYSICAL BOUNDARY CONDITIONS (explicit assumptions):
 #   Rain at land surface: DO = Csat(T_recharge, P_atm), saturated.
 #   LSR at water table: DO = Csat * survival_LSR; 0 < survival < 1.
-#   River recharge at aquifer entry: uncertain river_DO (separate
-#     boundary); proxy river-dominated well 2801 DO=10.2 mg/L used
-#     as prior centre, NOT as an independent river-water observation.
+#   River recharge at aquifer entry: DO=7.5 mg/L FIXED.
+#   River-dominated well 2801 is set to 7.5 in model-only data,
+#   never in the original source file or the fitting likelihood.
 #   Aquifer: both endmembers attenuate for reported MRT independently,
 #     then mix. Same aquifer reaction coefficient for both sources.
-#     First and second order are COMPETING MODELS, not fitted together.
+#     Zero and first order are COMPETING MODELS, not fitted together.
 #
 # CRUCIAL: Without vadose-zone travel time we estimate LSR DO deficit,
-# NOT a separate measured LSR first- or second-order reaction rate.
+# NOT a separate measured LSR zero- or first-order reaction rate.
 # Conditional LSR rates for ASSUMED t_vadose are exported solely
 # to show nonidentifiability; these are reparameterisations of one
 # inferred entry concentration.
@@ -23,8 +23,8 @@
 # O18, Na and Cl (joint Na-Cl residuals), optional excess air ablation.
 # Variable LSR isotope source uncertainty and true groundwater MRT.
 # Exclude anomalous far-south site 16758 from all analyses.
-# Site 2801 may inform the river DO prior but its groundwater DO
-# is ALWAYS masked in the likelihood and NEVER CV-scored.
+# The model-only 2801 DO is 7.5 but is ALWAYS masked in the
+# likelihood and NEVER CV-scored (no pseudo-observation).
 #
 # Needs CmdStanR, CmdStan, tidyverse and posterior. Data PRIVATE.
 library(tidyverse)
@@ -43,9 +43,9 @@ cfg <- list(
   input="data/Uwe_HP_data_prepared.csv",
   stan="stan/23_final_DO_two_pathway_kinetics.stan",
   excluded_site="16758",
-  river_proxy_site="2801",       # river-dominated well, NOT river sample
-  river_prior_center=10.2,       # mg/L based on well 2801; soft proxy
-  river_prior_sd=1.0,            # mg/L assumed proxy/boundary uncertainty
+  river_proxy_site="2801",     # river-dominated well; NOT a river sample
+  river_DO_boundary=7.5,       # fixed river-entry DO, mg/L
+  set_2801_model_DO=7.5,       # local modelling value only
   mask_river_proxy_DO=TRUE,      # mandatory to avoid double-use
   recharge_temperature_C=15,   # assumed; vary 10/20 C in sensitivities
   atmospheric_pressure_ratio=1,# P/P_sea_level, approximate
@@ -84,8 +84,9 @@ if (!file.exists(cfg$input))
 stopifnot(
   cfg$recharge_temperature_C>=0,cfg$recharge_temperature_C<=30,
   cfg$atmospheric_pressure_ratio>0,
-  cfg$C_ref>0,cfg$river_prior_sd>0,cfg$log_mrt_SD>0,
-  all(cfg$vadose_years_assumptions>0)
+  cfg$C_ref>0,cfg$river_DO_boundary>0,cfg$log_mrt_SD>0,
+  all(cfg$vadose_years_assumptions>0),
+  abs(cfg$set_2801_model_DO-cfg$river_DO_boundary)<1e-12
 )
 
 # Freshwater equilibrium oxygen saturation in mg/L; polynomial
@@ -106,10 +107,10 @@ message(
   signif(Csat,4)," mg/L."
 )
 message(
-  "UNCERTAIN RIVER RECHARGE BC: prior normal(",
-  cfg$river_prior_center,",",cfg$river_prior_sd,
-  " mg/L) constrained 0..12; proxy groundwater well ",
-  cfg$river_proxy_site," is not an actual river sample."
+  "FIXED RIVER-RECHARGE BC: ",cfg$river_DO_boundary,
+  " mg/L; model-only site 2801 DO assigned ",
+  cfg$set_2801_model_DO,
+  " mg/L, not used as an independent observation."
 )
 dir.create("outputs",recursive=TRUE,showWarnings=FALSE)
 dir.create("plots",recursive=TRUE,showWarnings=FALSE)
@@ -148,8 +149,14 @@ d <- raw %>%
 stopifnot(nrow(d)>=35L)
 proxy_index <- which(d$Site_ID==cfg$river_proxy_site)
 stopifnot(length(proxy_index)==1L)
-if (abs(d$DO[proxy_index]-cfg$river_prior_center)>1e-6)
-  warning("Prior centre differs from current proxy-site DO. Verify BC.")
+# Never alter the private input CSV or substitute values in-place.
+d$DO_original <- d$DO
+message(
+  "River proxy 2801 original DO=",d$DO_original[proxy_index],
+  " mg/L, model-only assigned value=",cfg$set_2801_model_DO,
+  " mg/L (DO observation masked)."
+)
+d$DO[proxy_index] <- cfg$set_2801_model_DO
 
 as_obs <- function(x) ifelse(is.finite(x),as.numeric(x),0)
 as_sigma <- function(x,default) ifelse(
@@ -173,20 +180,18 @@ stan_data <- list(
   Na_sd=pmax(.5,.03*as_obs(d$Na)),
   air_sd=as_sigma(d$xs_Air_uncertainty,.15),
   mrt_reported=as.numeric(d$MRT),
-  aq_order=1L,
+  aq_order=0L,
   Csat_rain=Csat,
   C_ref=cfg$C_ref,
   endmember_prior_scale=cfg$endmember_prior_scale,
   log_mrt_SD=cfg$log_mrt_SD,
-  river_DO_prior_mean=cfg$river_prior_center,
-  river_DO_prior_sd=cfg$river_prior_sd,
+  river_DO_boundary=cfg$river_DO_boundary,
   beta_survival_a=cfg$survival_prior_a,
   beta_survival_b=cfg$survival_prior_b
 )
-# 2801 DO was used to locate the RIVER prior, so NEVER appears
-# a second time as an observation in the model or CV.
+# Site 2801 is a model-only source boundary value, NOT evidence.
 stan_data$has_DO[proxy_index] <- 0L
-stan_data$DO_obs[proxy_index] <- 0
+stan_data$DO_obs[proxy_index] <- cfg$set_2801_model_DO
 eligible <- which(stan_data$has_DO==1L)
 message(
   "After removing ",cfg$excluded_site,": ",
@@ -211,7 +216,9 @@ posterior95 <- function(fit,vars) {
 names_global <- c(
   "river_DO","survival_LSR","LSR_DO_at_water_table",
   "LSR_DO_deficit","k_ref","sigma_DO",
-  "LSR_first_order_exposure","LSR_second_order_exposure",
+  "k_aquifer_zero_order_mg_L_yr",
+  "k_aquifer_first_order_yr_inv",
+  "LSR_zero_order_exposure","LSR_first_order_exposure",
   "mean_vadose_LSR_DO_loss","mean_aquifer_DO_loss",
   "sampled_well_vadose_loss_fraction",
   "mean_f_LSR","O18_R","O18_LSR","Cl_R","Cl_LSR",
@@ -252,18 +259,19 @@ sample_model <- function(order,x=stan_data,fold=0L,scenario=0L) {
   )
 }
 post <- list();diag <- list();wells <- list();conditional <- list()
-for (order in 1:2) {
-  message("FULL JOINT FIT aquifer reaction ORDER ",order)
+for (order in 0:1) {
+  message("FULL JOINT FIT aquifer reaction ORDER ",order,
+          if (order==0) " (zero-order)" else " (first-order)")
   fit <- sample_model(order)
-  post[[order]] <- posterior95(fit,names_global) %>%
+  post[[order+1L]] <- posterior95(fit,names_global) %>%
     mutate(aquifer_order=order,.before=1)
-  diag[[order]] <- select_diag(fit,order)
+  diag[[order+1L]] <- select_diag(fit,order)
   w <- fit$summary(variables=c(
     "f_LSR","true_MRT","mean_DO",
     "vadose_LSR_DO_loss","aquifer_DO_loss",
     "river_DO_after_aquifer","LSR_DO_after_aquifer"
   ))
-  wells[[order]] <- w %>%
+  wells[[order+1L]] <- w %>%
     mutate(
       sample_index=as.integer(str_match(
         variable,"\\[(\\d+)\\]")[,2]),
@@ -277,24 +285,24 @@ for (order in 1:2) {
   # conditional kinetic rates. These are NOT separately observed
   # LSR reaction rates and do not distinguish LSR reaction orders.
   sub <- posterior::as_draws_matrix(fit$draws(
-    variables=c("LSR_first_order_exposure",
-                "LSR_second_order_exposure")
+    variables=c("LSR_zero_order_exposure",
+                "LSR_first_order_exposure")
   ))
   rates <- map_dfr(cfg$vadose_years_assumptions,function(t) {
+    k0 <- sub[,"LSR_zero_order_exposure"]/t
     k1 <- sub[,"LSR_first_order_exposure"]/t
-    k2 <- sub[,"LSR_second_order_exposure"]/(Csat*t)
     bind_rows(
+      tibble(
+        assumed_vadose_years=t,
+        LSR_kinetic_order=0L,
+        rate_units="mg/L/year",
+        posterior_draw=k0
+      ),
       tibble(
         assumed_vadose_years=t,
         LSR_kinetic_order=1L,
         rate_units="year^-1",
         posterior_draw=k1
-      ),
-      tibble(
-        assumed_vadose_years=t,
-        LSR_kinetic_order=2L,
-        rate_units="L/(mg year)",
-        posterior_draw=k2
       )
     )
   }) %>%
@@ -306,7 +314,7 @@ for (order in 1:2) {
       .groups="drop"
     ) %>%
     mutate(aquifer_order=order,.before=1)
-  conditional[[order]] <- rates
+  conditional[[order+1L]] <- rates
   if (cfg$save_fits) fit$save_object(file=paste0(
     "outputs/final_DO_23_full_order",order,".rds"
   ))
@@ -321,7 +329,7 @@ write_csv(main,"outputs/final_DO_23_global_posteriors.csv")
 
 # Five GROUPED folds; 2801 is only a source/boundary proxy, never
 # a held-out DO target. Group labels and fold membership identical
-# between first and second-order aquifer models.
+# between zero- and first-order aquifer models.
 set.seed(cfg$seed)
 g <- split(eligible,d$cv_group[eligible])
 order_g <- sample(seq_along(g))
@@ -351,7 +359,7 @@ if (cfg$run_CV) {
   stopifnot(all(chosen %in% seq_along(folds)))
   for (fold in chosen) {
     held <- folds[[fold]]
-    for (order in 1:2) {
+    for (order in 0:1) {
       message(
         "Grouped held-out DO: fold ",fold,
         "/",cfg$folds," aquifer order ",order
@@ -417,10 +425,10 @@ if (cfg$run_CV) {
       names_prefix="order_"
     ) %>%
     mutate(
+      abs_error_zero=abs(observed_DO-order_0),
       abs_error_first=abs(observed_DO-order_1),
-      abs_error_second=abs(observed_DO-order_2),
-      second_minus_first_abs_error=
-        abs_error_second-abs_error_first
+      first_minus_zero_abs_error=
+        abs_error_first-abs_error_zero
     )
   write_csv(paired,"outputs/final_DO_23_cv_paired_errors.csv")
   cat("\nPAIRED GROUPED HELD-OUT DO SCORES:\n")
@@ -433,7 +441,7 @@ if (cfg$run_CV) {
     facet_wrap(~aquifer_order)+
     coord_equal()+
     labs(
-      title="Final DO model: aquifer first versus second order",
+      title="Final DO model: aquifer zero versus first order",
       subtitle="Grouped held-out wells; source fractions jointly fitted",
       x="Observed DO (mg/L)",
       y="Posterior predictive mean DO (mg/L)"
@@ -468,18 +476,20 @@ ggsave("plots/final_DO_23_posteriors.png",
 # aquifer-order comparison on each modified physically explicit input.
 if (cfg$run_prior_sensitivity) {
   cases <- list(
-    list(name="rain10C",T=10,river=cfg$river_prior_center,
+    list(name="rain10C",T=10,river=cfg$river_DO_boundary,
          sd=cfg$log_mrt_SD,ba=1,bb=1),
-    list(name="rain20C",T=20,river=cfg$river_prior_center,
+    list(name="rain20C",T=20,river=cfg$river_DO_boundary,
          sd=cfg$log_mrt_SD,ba=1,bb=1),
-    list(name="river7p5",T=cfg$recharge_temperature_C,
-         river=7.5,sd=cfg$log_mrt_SD,ba=1,bb=1),
+    list(name="river6p5",T=cfg$recharge_temperature_C,
+         river=6.5,sd=cfg$log_mrt_SD,ba=1,bb=1),
+    list(name="river8p5",T=cfg$recharge_temperature_C,
+         river=8.5,sd=cfg$log_mrt_SD,ba=1,bb=1),
     list(name="wideMRT",T=cfg$recharge_temperature_C,
-         river=cfg$river_prior_center,sd=.5,ba=1,bb=1),
+         river=cfg$river_DO_boundary,sd=.5,ba=1,bb=1),
     list(name="LSRstrongloss",T=cfg$recharge_temperature_C,
-         river=cfg$river_prior_center,sd=cfg$log_mrt_SD,ba=2,bb=5),
+         river=cfg$river_DO_boundary,sd=cfg$log_mrt_SD,ba=2,bb=5),
     list(name="LSRweakloss",T=cfg$recharge_temperature_C,
-         river=cfg$river_prior_center,sd=cfg$log_mrt_SD,ba=5,bb=2)
+         river=cfg$river_DO_boundary,sd=cfg$log_mrt_SD,ba=5,bb=2)
   )
   sensitivity <- list()
   for (caseid in seq_along(cases)) {
@@ -488,11 +498,11 @@ if (cfg$run_prior_sensitivity) {
     x$Csat_rain <- do_sat_mgL(
       cas$T,cfg$atmospheric_pressure_ratio
     )
-    x$river_DO_prior_mean <- cas$river
+    x$river_DO_boundary <- cas$river
     x$log_mrt_SD <- cas$sd
     x$beta_survival_a <- cas$ba
     x$beta_survival_b <- cas$bb
-    for (order in 1:2) {
+    for (order in 0:1) {
       message("Full posterior sensitivity ",cas$name,
               " order ",order)
       fit <- sample_model(order,x=x,scenario=caseid)
@@ -531,12 +541,13 @@ cat(
   "* Rain DO SATURATION concentration fixed by assumed recharge T, P.\n",
   "* LSR LOSS estimates are surface-to-water-table DO deficits,\n",
   "  not independently identifiable LSR reaction RATE constants.\n",
-  "* River recharge DO is an uncertain aquifer-entry boundary;\n",
-  "  proxy site 2801's DO is masked to avoid counting twice.\n",
-  "* First/second-order AQUFER kinetics are alternative models.\n",
-  "* k_ref is a common fractional loss rate at reference DO;\n",
-  "  first-order k1=k_ref [1/yr] and second-order k2=k_ref/C_ref\n",
-  "  [L/(mg yr)] must NOT be compared numerically without units.\n",
+  "* River aquifer-entry DO is FIXED at 7.5 mg/L.\n",
+  "  Site 2801's model-only DO=7.5 is excluded from fitting.\n",
+  "* ZERO- and FIRST-order AQUFER kinetics are alternative models.\n",
+  "* Zero-order k0=k_ref*C_ref [mg/L/yr], DO clipped to zero.\n",
+  "* First-order k1=k_ref [1/yr], exponential DO loss.\n",
+  "* LSR rates are conditional zero/first order for assumed vadose\n",
+  "  travel times: no unique LSR rate from these groundwater data.\n",
   "* Chemical source fractions are latent and correlated Na/Cl is\n",
   "  handled jointly; excess air excluded by default.\n",
   "* The aquifer travel time is represented by uncertain MRT, but\n",
