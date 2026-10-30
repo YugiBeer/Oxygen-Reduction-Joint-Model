@@ -19,6 +19,8 @@ data {
   array[N] int<lower=0,upper=1> has_cl;
   array[N] int<lower=0,upper=1> has_air;
   array[N] int<lower=0,upper=1> has_n2;
+  // During grouped CV, held-out DO is masked; its tracers and MRT remain.
+  array[N] int<lower=0,upper=1> has_DO;
   vector[N] o18;
   vector[N] cl;
   vector[N] air;
@@ -160,7 +162,9 @@ model {
         sqrt(square(air_sd[i]) + square(sigma_air))
       );
     }
-    do_obs[i] ~ normal(mean_DO[i], sqrt(square(.2) + square(sigma_DO)));
+    if (has_DO[i] == 1) {
+      do_obs[i] ~ normal(mean_DO[i], sqrt(square(.2) + square(sigma_DO)));
+    }
 
     if (use_n2 == 1 && has_n2[i] == 1) {
       n2_obs[i] ~ normal(
