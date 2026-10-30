@@ -6,3 +6,6 @@ Rplots.pdf
 outputs/
 plots/
 data/groundwater.csv
+
+# Original private research dataset for four-tracer model
+data/Uwe_HP_data_prepared.csv
