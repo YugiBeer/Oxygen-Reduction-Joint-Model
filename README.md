@@ -386,3 +386,21 @@ Outputs (local only, gitignored):
 **Evidence standard:** an improvement must be greater than fold-to-fold and MCMC uncertainty, and not depend entirely on the assumed spatial-variability prior. On 41 wells, a small RMSE difference is not evidence of identified spatial LSR DO variation. Source-specific DO loss remains conditional on an assumed 9.5 mg/L LSR reference, an assumed 7.5 mg/L river DO reference, the source mixing structure, and the MRT prior.
 
 **Implementation status:** script 14 and the Stan observation-mask modification are committed, but R/Stan has not been executed here. An independent Python joint posterior integration/CV check is being used to assess expected predictive behavior; its results must not be represented as R/Stan output. Since the source end-member priors were derived partly from the same study, the validation conditions on those empirical prior centres and is not a fully independent external-tracer validation.
+
+### Independent five-fold numerical check of common versus variable LSR DO
+
+An independent Python approximation to the same 41-well joint Bayesian model was fitted using **all three conservative tracers plus MRT uncertainty**. Reported MRT was mean-centered under a log-normal error model with log SD=0.25. Posterior mixing fraction and MRT uncertainty were numerically marginalized using fixed quadrature; site-specific LSR DO variation was integrated under the same bounded logistic-normal distribution used in Stan. Held-out DO was not included in each training posterior; held-out tracers and MRT remained known. The models used five matched groups of 9/8/8/8/8 wells (keeping related Eastbourne, Flaxmere, Gilbertson and repeat Site_ID wells together).
+
+**Matched grouped-CV results (mg/L):**
+
+| Subset | n | Common LSR DO: RMSE / MAE | Variable LSR DO: RMSE / MAE |
+|---|---:|---:|---:|
+| All usable wells | 41 | **1.8148 / 1.3084** | **1.8123 / 1.3094** |
+| LSR-dominated (tracer-derived fraction >= 0.5) | 5 | 1.9251 / 1.5223 | 1.9245 / 1.5272 |
+| Other wells | 36 | 1.7989 / 1.2787 | 1.7962 / 1.2791 |
+
+The full-data overall RMSE difference is only **−0.0024 mg/L** (variable minus common). Variable LSR DO has lower absolute error in 18 wells and higher error in 23 wells. A descriptive *five-fold block bootstrap* for the RMSE difference spans approximately **−0.0095 to +0.0121 mg/L**; with only five groups this is not a reliable formal uncertainty interval. The improvement is too small to support adding LSR DO heterogeneity for predictive purposes. The apparent gain is likewise negligible among the **five LSR-dominated wells**.
+
+**MCMC qualification:** Three independent Python chains per fold/model were run with 850 warmup and 1000 retained draws. Two problematic fits were rerun with four chains, 1650 warmup and 1750 retained draws. Maximum basic split-Rhat after these reruns was 1.056 (variable-LSR model, one fold); the remaining 9 fits were at most 1.035. Split-Rhat alone is not a full effective-sample-size or convergence assessment. All numbers above come from **Python, not a compiled/executed R/Stan model**. The R/Stan code in script 14 is provided for a separately reproducible validation and may yield slightly different results.
+
+**Interpretation:** This does not prove spatial variation in LSR oxygen loss is absent. Rather, with only five strongly LSR-dominated wells, the larger model provides no observed improvement in out-of-sample DO prediction under the current tracer mixing structure, river and LSR DO priors, and MRT uncertainty assumptions. Do not use its extra parameters to claim an identified LSR-versus-aquifer oxygen-loss split. Endmember prior centres remain partly empirical from the same study.
