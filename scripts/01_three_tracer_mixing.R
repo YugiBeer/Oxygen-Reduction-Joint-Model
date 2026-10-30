@@ -1,16 +1,7 @@
 # Three-tracer recharge fractions for the JOINT oxygen-loss workflow.
 # This is NOT the historical river-rich, 20-percentage-point screen.
 library(tidyverse)
-
-# Support Positron opened either at the project or its parent directory.
-if (!file.exists("data/groundwater.csv") &&
-    file.exists("Oxygen-Reduction-Joint-Model/data/groundwater.csv")) {
-  setwd("Oxygen-Reduction-Joint-Model")
-}
-if (!file.exists("data/groundwater.csv")) {
-  stop("Cannot find data/groundwater.csv. Open the project in Positron.")
-}
-dir.create("outputs", showWarnings = FALSE)
+setwd(here::here("Oxygen-Reduction-Joint-Model"))
 
 tracers <- c("O18", "Cl", "xs_Air")
 maximum_tracer_fraction_range <- 0.35
