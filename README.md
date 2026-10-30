@@ -101,3 +101,25 @@ Outputs:
 **Structural non-identifiability:** An alternative model in which river- and rainfall-recharge DO at entry vary as `R_i = R exp(-b MRT_i)` and `P_i = P exp(-b MRT_i)` produces *exactly the same predictions* as a first-order transport attenuation model with k=b. Fitted DO–MRT observations alone cannot locate oxygen reduction in the infiltration zone versus the saturated aquifer.
 
 The confinement-group analysis was calculated independently in Python for checking. The R script must still be run and diagnosed in Positron. The Bayesian random effects are Gaussian and can imply unphysical negative inlet DO at extreme tails; physical constraints and independent recharge DO observations would improve the next model.
+
+
+## Age-adjusted river DO prior (script 06)
+
+Run from Positron after the mixing script:
+
+```r
+source("scripts/01_three_tracer_mixing.R")
+source("scripts/06_age_adjusted_river_DO_prior.R")
+```
+
+The model holds the river DO **mean** at an uncertain reference of 7.5 mg/L and permits age-related attenuation of **variance**. The reported 1.9 mg/L SD describes the monitored **daily means**, not the diurnal cycle. The daily-mean variance is partitioned between a persistent component and a seasonal sinusoid; the analysis tests 100%, 50% and 25% persistent variance. An additional 1.0 mg/L **diurnal input SD is assumed, not measured**, and is attenuated separately. The attenuation filter for either oscillation is `H(T,MRT) = 1/sqrt(1+(2*pi*MRT/T)^2)`, derived from an **assumed exponential travel-time distribution**.
+
+The same six model variants are fitted and compared using matched five-fold cross-validation: each of the three river-prior variance scenarios with either k=0 or a fitted first-order age-related coefficient. Outputs are unique to this script:
+- `outputs/age_adjusted_river_prior_posteriors.csv`
+- `outputs/age_adjusted_river_prior_CV_summary.csv`
+- `outputs/age_adjusted_river_prior_CV_predictions.csv`
+- `outputs/age_adjusted_river_prior_convergence.csv`
+- `plots/age_adjusted_river_prior_k.png`
+- `plots/age_adjusted_river_prior_CV.png`
+
+**Interpret carefully:** Only site 2801 has MRT=0 in the current 29-well selection; the remaining MRTs are ≥1 year. The year-specific attenuation is an assumed travel-time response; MRT alone does not determine dispersion or attenuation. Piston flow would simply delay the sinusoid. The daily-mean variance split cannot be estimated from the 29 well DO measurements, and should be constrained by time-frequency analysis of the actual river record where possible. The age term still cannot distinguish infiltration loss from saturated-aquifer reaction. The code is supplied for execution in Positron; the equivalent numerical sensitivity was independently evaluated in Python, but this R script has not been run here.
