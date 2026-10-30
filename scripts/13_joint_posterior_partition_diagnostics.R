@@ -241,9 +241,11 @@ ggsave(
 
 p3 <- ggplot(
   budget,
-  aes(median, scenario, xmin = lower95, xmax = upper95)
+  aes(median, scenario)
 ) +
-  geom_pointrange() +
+  geom_segment(aes(x = lower95, xend = upper95,
+                   y = scenario, yend = scenario), linewidth = .8) +
+  geom_point(size = 2.5) +
   facet_wrap(~ metric, scales = "free_x") +
   labs(
     title = "Prior sensitivity of model-implied per-well oxygen depletion",
