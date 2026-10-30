@@ -312,6 +312,13 @@ if (cfg$run_CV) {
       x$DO_obs[held] <- 0
       x$has_progress[held] <- 0L
       x$progress_obs[held] <- 0
+      # The original progress error was estimated from measured
+      # xs_N2/xs_N2_sig. At held-out wells it MUST NOT be passed
+      # to the posterior predictive generator: use a training-only
+      # representative error instead to prevent response leakage.
+      x$progress_logit_sd[held] <- median(
+        stan_base$progress_logit_sd[-held]
+      )
       message("Paired CV ",fold,"/",cfg$nfolds,": ",s$model)
       fit <- fit_spec(s,fold,x)
       var_DO <- paste0("mean_DO[",held,"]")
