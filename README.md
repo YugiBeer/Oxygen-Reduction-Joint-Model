@@ -287,3 +287,47 @@ Figures are:
 **Independent Python numerical test, not yet executed as R:** Gamma alpha posterior medians are approximately 5.0, 12.8, and 47.3 for alpha prior medians 2, 10, and 50. Corresponding k posterior medians are approximately 0.083, 0.077, and 0.072 yr^-1. The piston-flow Bayesian k posterior median is about 0.070 yr^-1. Under the median-10 prior, k 95% CrI is about 0.059–0.106 and alpha about 2.3–128. Basic split-Rhat values for the independent Python chains were <1.01. The independent Python grouped CV had RMSE 1.173 mg/L (piston) versus 1.189 mg/L (gamma, prior median 10), a **small difference**; the R implementation uses its own randomized fold arrangement, so compare its generated results rather than treating the Python scores as R outputs.
 
 **Conclusion:** alpha and k are negatively correlated. DO and MRT data poorly identify groundwater age-distribution width without independent constraints: alpha posteriors shift considerably with alpha priors. k is more stable but its uncertainty broadens when alpha is allowed to vary. This analysis does **not** establish the physical location of oxygen depletion or account for uncertainty in mixing fractions and MRT. No groundwater samples are uploaded to the public repository.
+
+
+## Joint Bayesian source-mixing, LSR DO and MRT model (script 12)
+
+**This addresses the main joint-inference gap.** Earlier Bayesian oxygen-reduction scripts held the three-tracer source fractions and groundwater MRT fixed. Script 12 estimates their uncertainties **simultaneously** with the oxygen model, fitting the original measured tracer values rather than the previously calculated mixing fractions.
+
+**Conservative mixing tracers:** chloride, δ18O and **excess air (xs_Air)**. **Excess N2 (xs_N2) is not treated as a conservative mixing tracer** because it can include denitrification products. It may be included as a fourth, *reactive* observation via an optional empirical age-related association; this is **not** a stoichiometric denitrification model and must not be interpreted causally without an independent nitrogen budget.
+
+The Stan implementation is in `stan/12_joint_bayesian_mixing.stan`; the Positron runner is in `scripts/12_joint_bayesian_mixing.R`. Requires R packages `tidyverse`, `here`, `cmdstanr`, `posterior`, and a separate **CmdStan installation**. For example, if `cmdstanr` is not installed:
+
+```r
+install.packages("cmdstanr",
+                 repos = c("https://stan-dev.r-universe.dev",
+                           getOption("repos")))
+cmdstanr::install_cmdstan()
+```
+
+Ensure the **local, private** file `data/groundwater.csv` exists (created by the earlier local workflow; never commit it). Then run:
+
+```r
+source("scripts/12_joint_bayesian_mixing.R")
+```
+
+The default fit uses **41 wells with nonmissing MRT and DO**, including groundwater samples previously excluded for disagreement among tracer-derived fractions. A missing δ18O or chloride measurement is skipped in the corresponding observation likelihood; it does not force the well out of the analysis. Each sample has a latent bounded LSR fraction with a Uniform(0,1) prior. Estimated tracer end members each have priors and observational errors, and a Student-t(4) tracer likelihood with fitted extra dispersion limits the influence of samples inconsistent with simple binary mixing.
+
+**Default priors and sensitivities:**
+- River δ18O: Normal(−7.79, 0.24‰); LSR δ18O: Normal(−6.58, 0.40‰).
+- River Cl: Normal(4.9, 3 mg/L); LSR Cl: Normal(60, 15 mg/L), with physically bounded nonnegative values.
+- River excess air: Normal(0.122, 0.35 mL/kg); LSR excess air: Normal(4.04, 1.4 mL/kg), physically bounded nonnegative values.
+- Monitored river DO mean: Normal(7.5, 0.8 mg/L), bounded 0–12 mg/L.
+- Effective LSR DO at aquifer entry: Uniform(0,9.5 mg/L), so its deficit relative to the assumed 9.5 mg/L pre-infiltration reference is estimated.
+- Apparent first-order reduction k: HalfNormal(0.15 yr^-1); extra DO residual SD: HalfNormal(1.5 mg/L).
+- Individual true MRT: log-normal around reported MRT, with **assumed log SD 0.25 or 0.50**. A reported zero MRT receives a near-zero half-normal prior.
+- Optional spatial variation in LSR DO via a hierarchical logit-normal distribution (`cfg$vary_lsr_do = TRUE`); default is a common effective LSR DO across wells.
+- Optional gamma age-distribution shape with log-normal prior median 10, log SD 1.3 (`cfg$default_gamma = TRUE`); default is piston attenuation using the latent MRT.
+- Optional xs_N2: prior on river/LSR background excess N2, an empirical nonnegative coefficient relating N2 to apparent age-associated DO loss, and extra residual variance (`cfg$use_n2` scenario in R). **Do not interpret this coefficient as nitrogen production stoichiometry.**
+
+**Important empirical-Bayes caveat:** The endmember prior centres derive from the same study samples used in the fit, so the prior and likelihood are not fully independent. This can effectively double-use evidence and narrow source-fraction posteriors. Test a larger `cfg$tracer_prior_scale`, anchor with external measurements, and do not treat the endmember posteriors as independent evidence of source composition.
+
+By default the R runner fits three scenarios: MRT log SD 0.25 without N2, MRT log SD 0.25 with N2 as reactive response, and MRT log SD 0.50 without N2. It saves posterior summaries, individual source-fraction intervals, latent MRT intervals, fitted DO, MCMC diagnostics, plot and serialized fits under gitignored `outputs/` and `plots/`. The detailed well-level outputs remain local.
+
+**Independent numerical prototype** (Python custom-MH integrating over latent fLSR and true MRT, NOT execution of Stan/R code): under MRT log SD 0.25, apparent k approximately 0.072 (95% CrI 0.049–0.104) yr^-1 and common LSR loss approximately 2.44 (0.15–7.04) mg/L. Adding reactive excess N2 gives k approximately 0.071 (0.047–0.101). MRT log SD 0.50 without N2 gives k approximately 0.085 (0.056–0.121). These runs use a different numerical implementation (quadrature plus Metropolis rather than explicit latent-variable HMC); their exact posteriors and credible intervals need not match the Stan fit. The Python fit also indicates that inferred site LSR fractions can differ appreciably from three-tracer medians, including wells 63, 1247 and 3698 Flaxmere. The R/Stan model **has not yet been compiled or run in the user's environment**.
+
+**Identifiability limit:** A broad posterior on LSR source DO and source fractions means the partition between oxygen depleted during LSR and oxygen depleted in subsequent groundwater transport is not fixed by DO observations alone. The inferred k remains a model-conditional **age-associated** coefficient, not direct proof that all oxygen reduction happened within the saturated aquifer. Need posterior predictive checks, Rhat/ESS assessment, endmember-prior sensitivity and matched group CV before treating any of these outputs as a definitive result.
