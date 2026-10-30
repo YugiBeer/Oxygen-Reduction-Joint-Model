@@ -103,6 +103,7 @@ stan_data_base <- list(
   has_cl = as.integer(is.finite(d$Cl)),
   has_air = as.integer(is.finite(d$xs_Air)),
   has_n2 = as.integer(is.finite(d$xs_N2)),
+  has_DO = rep(1L, nrow(d)), # fit all groundwater DO measurements
   o18 = observed(d$O18),
   cl = observed(d$Cl),
   air = observed(d$xs_Air),
