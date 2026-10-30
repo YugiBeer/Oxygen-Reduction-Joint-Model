@@ -208,3 +208,24 @@ Script 08 fits four independently initialized Bayesian MCMC chains for each mode
 The model was also evaluated independently in Python; approximate five-fold Bayesian posterior predictive RMSEs using all 29 wells were 1.08 (A), 1.11 (B), 1.12 (C bounded), and 3.09 (D bounded) mg/L. These are **independent numerical checks** and should not be misrepresented as results of the R code; repeat the script in Positron to validate R performance. Small differences due to MCMC randomness are expected.
 
 **Key inference:** Adding mean or variable LSR oxygen loss does not improve held-out prediction under these assumptions, and inferred k remains around 0.07 year⁻¹. The LSR loss parameters are poorly constrained: only five wells are LSR-dominated. The fit does **not** uniquely identify where the age-related depletion occurred; age-correlated source/boundary variation and uncertainty in mixing fractions or MRT remain relevant alternatives. The model uses fixed source fractions and MRT point estimates. The logistic-normal quadrature is approximate. No private groundwater data are stored in this public repository.
+
+
+## DO residuals versus LSR contribution and mixing uncertainty (script 09)
+
+This is a diagnostic of the EXISTING first-order model, not a new oxygen-loss process.
+
+```r
+source("scripts/01_three_tracer_mixing.R")
+source("scripts/09_LSR_mixing_residual_diagnostics.R")
+```
+
+- Refit the current first-order model (monitored river DO fixed at 7.5 mg/L; common **effective LSR DO** bounded 0–9.5 mg/L); predict each held-out well by **leave-one-well-out** refitting.
+- Test whether absolute/signed DO residuals correlate with LSR fraction or with **raw (unclipped)** disagreement among the three tracer-derived LSR fractions. Repeat excluding site 2801. Spearman p-values are exploratory.
+- Hold river DO and the fitted apparent k fixed, then permit **each well's LSR entry DO to vary independently across the entire physical 0–9.5 mg/L range**. Compute whether observed DO falls within that well's permitted prediction interval. This is an extreme sensitivity bound, not a fitted hierarchical model.
+- Refitting the same 29 selected wells with δ18O alone, chloride alone, and excess air alone checks whether alternative tracer weights explain DO residuals. Report both apparent k and inferred effective LSR DO: a stable k **does not imply** inferred LSR oxygen loss is stable.
+- Compare DO prediction ranges obtained from the three tracer-specific fractions, without changing other model parameters.
+- Optional spatial Moran's I diagnostic with five symmetric nearest neighbors and permutations. The **private** sample coordinates must be present locally, as `E/N` columns in the mixing file or in a local `data/Uwe_HP_data_prepared.csv`. This is exploratory with clustered samples. No coordinates are added to GitHub.
+
+Outputs are `outputs/LSR_mixing_residuals_by_well.csv`, `outputs/LSR_mixing_residual_correlations.csv`, `outputs/LSR_mixing_alternative_tracers.csv` and optionally `outputs/LSR_mixing_residual_spatial_test.csv`. Plots are `plots/LSR_mixing_abs_residual_vs_LSR.png`, `plots/LSR_mixing_abs_residual_vs_tracer_disagreement.png` and `plots/LSR_mixing_possible_DO_by_well.png`.
+
+**Independent Python diagnostic of the 29-well dataset:** Spearman correlations between absolute LOOWO DO error and LSR fraction -0.19 (p=0.32), and with intertracer disagreement -0.13 (p=0.51). Under the fitted fixed river DO and k, independently variable LSR entry DO within 0–9.5 mg/L can match only 6 of 29 observations. Refitting using individual tracers gives k about 0.0656–0.0716 yr^-1, but effective LSR DO 6.74–9.17 mg/L. This demonstrates uncertainty in the LSR DO-loss partition even though changing mixing fractions does not improve predictive DO RMSE. None of these results proves that the first-order rate belongs solely to saturated-aquifer reaction. The R script needs its first execution in Positron.
