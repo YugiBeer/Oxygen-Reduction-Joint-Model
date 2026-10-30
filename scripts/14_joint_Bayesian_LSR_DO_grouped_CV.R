@@ -219,10 +219,17 @@ for (j in selected_folds) {
                   observed_DO <= predicted_upper95
     )
 
+    # Check convergence not only for k/tau but also tracer
+    # endmembers and the latent fLSR/MRT/LSR DO of held-out wells.
     sumpars <- fit$summary(
       variables = c(
         "k", "central_LSR_DO_loss", "tau_LSR",
-        "sigma_DO", "river_DO"
+        "sigma_DO", "river_DO",
+        "o18_R", "o18_LSR", "cl_R", "cl_LSR",
+        "air_R", "air_LSR",
+        paste0("f_LSR[", held, "]"),
+        paste0("true_MRT[", held, "]"),
+        paste0("LSR_entry_DO[", held, "]")
       )
     )
     diag[[length(diag) + 1L]] <- sumpars %>%
