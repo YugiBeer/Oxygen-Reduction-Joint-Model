@@ -34,6 +34,8 @@ data {
   int<lower=0,upper=1> vary_lsr_do;
   real<lower=0> gamma_prior_median;
   real<lower=0> tracer_prior_scale;
+  real<lower=0> lsr_prior_a;
+  real<lower=0> lsr_prior_b;
 }
 parameters {
   real<lower=-9,upper=-6.5> o18_R;
@@ -100,8 +102,10 @@ model {
   air_LSR ~ normal(4.04, 1.4 * tracer_prior_scale);
 
   river_DO ~ normal(7.5, .8);
-  // central_LSR_entry_DO uniform on 0 to 9.5, by its bounds;
-  // no concentrated prior on its initial oxygen loss.
+  // Beta prior on effective LSR DO / 9.5. (1,1) = uniform;
+  // (2,5) favours oxygen-poor LSR; (5,2) favours oxygen-rich LSR.
+  // This parameterization explicitly tests prior-dependence.
+  (central_LSR_entry_DO / 9.5) ~ beta(lsr_prior_a, lsr_prior_b);
   tau_LSR ~ normal(0, 1.5);
   z_LSR ~ std_normal();
   f_LSR ~ beta(1, 1);
@@ -125,7 +129,12 @@ model {
     // Conditional prior for true MRT around each reported MRT.
     // The assumed log SD is sensitivity-tested, not observed.
     if (mrt_reported[i] > 0) {
-      true_MRT[i] ~ lognormal(log(mrt_reported[i]), log_mrt_SD);
+      // Reported MRT is a MEAN, not median, of the latent prior.
+      // Shift log mean so E[true_MRT] = reported MRT exactly.
+      true_MRT[i] ~ lognormal(
+        log(mrt_reported[i]) - 0.5 * square(log_mrt_SD),
+        log_mrt_SD
+      );
     } else {
       true_MRT[i] ~ normal(0, .5);
     }
