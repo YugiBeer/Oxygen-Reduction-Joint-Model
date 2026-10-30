@@ -528,7 +528,9 @@ p_k <- ggplot(
   k_intervals,
   aes(median, model, xmin = lower95, xmax = upper95)
 ) +
-  geom_pointrange() +
+  geom_segment(aes(x = lower95, xend = upper95,
+                   y = model, yend = model), linewidth = 1) +
+  geom_point(size = 2.5) +
   labs(
     title = "Age-model prior sensitivity of apparent k",
     subtitle = "Bayesian posterior medians and 95% credible intervals",
