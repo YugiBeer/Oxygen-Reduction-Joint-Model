@@ -628,9 +628,18 @@ if (cfg$run_prior_sensitivity) {
     list(name="LSRstrongloss",T=cfg$recharge_temperature_C,
          river=cfg$river_DO_boundary,sd=cfg$log_mrt_SD,ba=2,bb=5),
     list(name="LSRweakloss",T=cfg$recharge_temperature_C,
-         river=cfg$river_DO_boundary,sd=cfg$log_mrt_SD,ba=5,bb=2)
+         river=cfg$river_DO_boundary,sd=cfg$log_mrt_SD,ba=5,bb=2),
+    list(name="wideTracer",T=cfg$recharge_temperature_C,
+         river=cfg$river_DO_boundary,
+         sd=cfg$log_mrt_SD,ba=1,bb=1,
+         prior_scale=2),
+    list(name="withExcessAir",T=cfg$recharge_temperature_C,
+         river=cfg$river_DO_boundary,
+         sd=cfg$log_mrt_SD,ba=1,bb=1,
+         use_air=TRUE)
   )
   sensitivity <- list()
+  sensitivity_diagnostics <- list()
   for (caseid in seq_along(cases)) {
     cas <- cases[[caseid]]
     x <- stan_data
@@ -641,6 +650,12 @@ if (cfg$run_prior_sensitivity) {
     x$log_mrt_SD <- cas$sd
     x$beta_survival_a <- cas$ba
     x$beta_survival_b <- cas$bb
+    if (!is.null(cas$prior_scale))
+      x$endmember_prior_scale <- cas$prior_scale
+    if (isTRUE(cas$use_air)) {
+      x$has_air <- as.integer(is.finite(d$xs_Air))
+      x$air <- as_obs(d$xs_Air)
+    }
     for (order in 0:1) {
       message("Full posterior sensitivity ",cas$name,
               " order ",order)
@@ -649,18 +664,52 @@ if (cfg$run_prior_sensitivity) {
         posterior95(fit,c(
           "river_DO","survival_LSR",
           "LSR_DO_at_water_table","LSR_DO_deficit",
-          "k_ref","mean_vadose_LSR_DO_loss",
+          "k_ref","aquifer_rate_actual",
+          "mean_vadose_LSR_DO_loss",
           "mean_aquifer_DO_loss"
         )) %>% mutate(
-          scenario=cas$name,order=order,.before=1
+          scenario=cas$name,order=order,
+          rate_units=if_else(
+            variable=="aquifer_rate_actual",
+            if (order==0) "mg/L/year" else "year^-1",
+            NA_character_
+          ),
+          .before=1
         )
       check <- select_diag(fit,order)
-      if (any(check$rhat>cfg$max_rhat,na.rm=TRUE))
-        warning("Sensitivity ",cas$name,
-                " has unresolved convergence.")
+      sensitivity_diagnostics[[length(sensitivity_diagnostics)+1L]] <-
+        check %>% mutate(scenario=cas$name,.before=1)
+      # Posterior correlation sensitivity to source/age/boundary.
+      z <- posterior::as_draws_matrix(fit$draws(
+        variables=c("LSR_DO_deficit","aquifer_rate_actual")
+      ))
+      pair_corr <- tibble(
+        scenario=cas$name,order=order,
+        pearson_deficit_rate=cor(
+          z[,"LSR_DO_deficit"],
+          z[,"aquifer_rate_actual"]
+        ),
+        spearman_deficit_rate=cor(
+          z[,"LSR_DO_deficit"],
+          z[,"aquifer_rate_actual"],
+          method="spearman"
+        )
+      )
+      if (!exists("sensitivity_correlations"))
+        sensitivity_correlations <- list()
+      sensitivity_correlations[[length(sensitivity_correlations)+1L]] <-
+        pair_corr
       write_csv(
         bind_rows(sensitivity),
         "outputs/final_DO_23_sensitivity_posteriors.csv"
+      )
+      write_csv(
+        bind_rows(sensitivity_diagnostics),
+        "outputs/final_DO_23_sensitivity_diagnostics.csv"
+      )
+      write_csv(
+        bind_rows(sensitivity_correlations),
+        "outputs/final_DO_23_sensitivity_correlations.csv"
       )
     }
   }
