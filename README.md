@@ -796,14 +796,19 @@ The conservative source-fraction likelihood uses δ18O, chloride and sodium, wit
 source("scripts/23_final_DO_two_pathway_kinetics.R")
 ```
 
-It runs two full-data models (aq_order 0 and 1) and five matched grouped DO CV folds for each order (12 Stan fits total). `cfg$run_only_fold=1L` provides a smoke test; `cfg$run_CV=FALSE` runs the two full fits only. `cfg$run_prior_sensitivity=TRUE` runs additional full fits varying rainfall saturation temperature, **fixed river boundary in explicit alternative scenarios**, MRT uncertainty and LSR prior. The **main** fixed river boundary remains 7.5 mg/L.
+**Full audit is enabled by default:** two full-data fits (aq_order 0 and 1), five matched grouped DO CV folds for each order (10 fits), and nine paired full-data sensitivity scenarios (18 fits): **30 Stan fits in total**. These may require hours of compute. To smoke-test, edit `cfg$run_prior_sensitivity=FALSE` and `cfg$run_only_fold=1L` (four fits); to run only the two full posteriors, also set `cfg$run_CV=FALSE`. Restore defaults for final inference. Sensitivities cover rainfall saturation temperature, **alternative fixed river boundaries 6.5/8.5 mg/L**, MRT uncertainty, LSR prior, tracer-endmember prior width, and inclusion of excess air. The **primary** river boundary remains fixed at 7.5 mg/L.
 
 Local, gitignored results:
 - `outputs/final_DO_23_boundary_conditions.csv` — authoritative boundary-condition audit
 - `outputs/final_DO_23_global_posteriors.csv` — aquifer rate by correct physical units, LSR survival and DO deficit, other source/posterior quantities
 - `outputs/final_DO_23_conditional_LSR_rates.csv` — prior-time-conditional *zero* and *first* LSR rates, not uniquely inferred
 - `outputs/final_DO_23_cv_scores.csv`, `outputs/final_DO_23_cv_paired_errors.csv`, `outputs/final_DO_23_cv_predictions.csv`
-- `outputs/final_DO_23_full_diagnostics.csv`, `outputs/final_DO_23_cv_diagnostics.csv`, site-specific posteriors and posterior RDS files
+- `outputs/final_DO_23_full_diagnostics.csv`, `outputs/final_DO_23_fit_status.csv`, `outputs/final_DO_23_cv_fit_status.csv`, `outputs/final_DO_23_cv_diagnostics.csv`, site-specific posteriors and posterior RDS files
+- `outputs/final_DO_23_identifiability_summary.csv` and `plots/final_DO_23_identifiability.png` — **joint** posterior of LSR loss against aquifer reduction rate
+- `outputs/final_DO_23_cv_bootstrap_summary.csv` — grouped-paired bootstrap uncertainty in held-out zero-versus-first-order prediction error
+- `outputs/final_DO_23_sensitivity_posteriors.csv`, `outputs/final_DO_23_sensitivity_correlations.csv`, `outputs/final_DO_23_sensitivity_diagnostics.csv` — robustness and convergence by scenario
 - `plots/final_DO_23_posteriors.png`, `plots/final_DO_23_cv.png`
+
+**Full reproducibility protocol:** [Final DO model and identifiability analysis](docs/final_DO_model_protocol.md). Do not select a reaction order unless all full and CV fits satisfy MCMC diagnostic gates and the predictive comparison is meaningful.
 
 **Limitations:** Source fractions, MRT, LSR entry DO and aquifer k are estimated jointly and may compensate for one another. The shared source-specific travel-time and independent source-attenuation-before-mixing assumptions are a useful effective description, not a resolved transport history. The zero-order truncation has a nondifferentiable zero crossing and may require careful NUTS diagnostics. Summarized DO losses are arithmetic averages across sampled wells, NOT flux-weighted catchment or aquifer budgets. The two aquifer reaction orders must be compared on matched held-out DO RMSE/MAE and predictive coverage, not posterior rate magnitudes (units differ). **The corrected Stan/R workflows were statically checked but have not yet been compiled or sampled in R; do not quote posterior rate estimates until convergence is verified.**
