@@ -38,3 +38,33 @@ Excess air is inferred from dissolved gases; its treatment as a conservative mix
 ## Verification
 
 The prepared standalone model and selection were numerically cross-checked against the earlier analysis. R itself was not executed in the preparation environment; please run both scripts in Positron to validate the outputs.
+
+## Bayesian uncertainty test (optional; run after script 01)
+
+The main scientific question is whether groundwater residence time explains oxygen depletion when the DO entering the aquifer from each recharge source is uncertain. The Bayesian script compares **recharge-only (k = 0)** against **recharge plus a first-order age-dependent depletion coefficient**.
+
+Run in Positron after creating the local groundwater.csv:
+
+```r
+source("scripts/01_three_tracer_mixing.R")
+source("scripts/04_bayesian_recharge_DO.R")
+```
+
+This Bayesian script is a **separate sensitivity experiment**: it does not overwrite the joint-model estimates in script 02. Script 03 is an optional plotting script shared separately.
+
+**Prior specification and interpretation**
+
+- Population mean river DO: Normal(7.5, 0.7 mg/L), truncated to (0, 12). The 0.7 mg/L uncertainty of the mean is an **assumption**, not the observed river temporal SD.
+- Between-sample river DO SD: half-normal(scale 1.9 mg/L), informed by river DO variability.
+- Population mean effective rainfall DO: uniform(0, 9.5 mg/L).
+- Between-sample rainfall DO SD: half-normal(scale 2.5 mg/L).
+- Additional unexplained site variation: half-normal(scale 1.5 mg/L). The measurement SD is fixed at 0.2 mg/L.
+- First-order depletion k: half-normal(scale 0.10 year^-1), or exactly zero in the competing model.
+
+The between-sample source DO values are Gaussian random effects that are *integrated out analytically*. This is a modelling approximation: individual latent source DO is not explicitly truncated at physical bounds.
+
+In addition to the baseline priors, a wider prior scenario tests k sensitivity to the assumptions. The script produces posterior summaries, a simple four-chain R-hat check, **matched five-fold cross-validated** predictive RMSE and log score, and diagnostic PNG plots. The cross-validation refits both models using only the training folds.
+
+**Scientific limitation:** These models assume initial recharge DO variability is statistically independent of groundwater mean residence time, conditional on mixing fraction. A positive k establishes a need for *age-associated* depletion under those assumptions. It does **not** establish the site of oxygen consumption (infiltration pathway versus saturated aquifer). The three-tracer recharge fractions are held fixed; excess-air tracer suitability and source fraction uncertainty are not propagated here.
+
+The initial posterior and predictive comparison was cross-checked using a separate Python implementation. **The R script has not been executed in this environment** and should be run in Positron.
