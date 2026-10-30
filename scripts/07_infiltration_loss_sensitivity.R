@@ -1,4 +1,5 @@
-# 07_infiltration_loss_sensitivity.R
+# 07_infiltration_loss_sensitivity.R (legacy filename retained for compatibility)
+# In this analysis, "infiltration" means LAND-SURFACE recharge only.
 #
 # Purpose
 # -------
@@ -18,9 +19,10 @@
 # - k is an apparent age-associated coefficient. It cannot identify
 #   where reduction occurred (recharge pathway versus aquifer).
 # - "Confined" means sampled well status, NOT recharge location.
-# - No spatial coordinates or direct recharge DO measurements available.
+# - No spatial coordinates or direct recharge-entry DO measurements available.
 # - An age-correlated recharge-entry-DO model can be mathematically
-#   IDENTICAL to a model with aquifer age-dependent reduction.
+#   IDENTICAL to a model with age-dependent reduction.
+# - River-source DO deficit is NOT independently measured riverbed loss.
 # - No Bayesian posterior in this script: bounded least squares and
 #   grouped CV are transparent, reproducible sensitivity diagnostics.
 #
@@ -136,7 +138,7 @@ profile_one <- function(drop_2801) {
   } else {
     d
   }
-  loss_grid <- seq(0, cfg$river_DO, by = cfg$river_deficit_step)
+  loss_grid <- seq(0, cfg$river_DO, by = cfg$river_DO_deficit_step)
   purrr::map_dfr(loss_grid, function(L) {
     fit <- fit_fixed_deficit(dat, L)
     # Within-fold refitting: held-out wells do NOT enter the fit.
@@ -241,7 +243,8 @@ write_csv(summary_required, "outputs/infiltration_required_loss_summary.csv")
 # "shared" fits effective river entry DO R and rain DO P, with k=0.
 # "confined" fits R_unconfined, R_confined and common rain DO P, k=0.
 # "both sources" fits confined/unconfined R and P independently, k=0.
-# "age" fixes R=7.5 and fits P,k (no explicit infiltration-loss term).
+# "age" fixes river reference R=7.5 and fits P,k, with no explicit
+# river-source deficit parameter. P accounts for land-surface pathway loss.
 #
 # A confined / unconfined contrast is a weak proxy for spatial variance.
 # It must NOT be interpreted as the actual location of oxygen loss.
