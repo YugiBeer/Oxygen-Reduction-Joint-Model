@@ -253,3 +253,37 @@ Files generated:
 **Independent Python check (all 29 wells, grouped CV):** Piston k=0.0701 yr^-1, RMSE 1.001 mg/L; gamma shape 10 k=0.0761, RMSE 1.005; shape 5 k=0.0824, RMSE 1.014; shape 2 k=0.1038, RMSE 1.065; exponential shape 1 k=0.1491, RMSE 1.192. **The Python and R randomized group folds are not identical**, so do not present the Python numbers as output from executing the R script.
 
 **Interpretation:** Wider age distributions increase the fitted apparent reduction coefficient but do not improve predictive DO accuracy. This does not establish that the age distribution is piston flow or that oxygen consumption occurs exclusively in the saturated aquifer. The river-derived and LSR components may have different age distributions, and the reported MRT could already be conditional on a specific lumped-parameter model. Age-tracer dating details and uncertainty are needed before introducing Bayesian priors on age-distribution shape.
+
+## Bayesian inference for age-distribution and oxygen-loss parameters (script 11)
+
+**Preferred next step after fixed gamma-shape sensitivity in script 10:** Put priors on the uncertain **gamma shape** alpha and apparent first-order coefficient k, and fit them jointly with effective land-surface recharge (LSR) DO, mean river DO and residual variation. This does **not** investigate how the supplied groundwater MRT values were originally derived, nor does it fit a river-recharge loss term.
+
+Run after the three-tracer mixing script:
+
+    source("scripts/01_three_tracer_mixing.R")
+    source("scripts/11_bayesian_age_parameter_priors.R")
+
+The groundwater-age attenuation is **(1 + k*MRT/alpha)^(-alpha)** for gamma shape alpha, with piston-flow exp(-k*MRT) fitted as a separate Bayesian reference model. The R code uses 29 three-tracer-screened wells. Predictions under the gamma model are conditional on the given MRTs and the assumption that river and LSR fractions share the same age distribution.
+
+**Specified priors (some assumptions, not independently measured):**
+- Mean river DO: Normal(7.5, 0.7 mg/L), bounded to 0–12 mg/L. The prior SD of the *mean* is assumed; it is **not** the measured 1.9 mg/L SD of daily means.
+- Effective LSR DO at aquifer entry: Uniform(0, 9.5 mg/L), representing an unknown common LSR oxygen deficit but **not** an independent LSR-loss parameter per well.
+- Apparent first-order k: HalfNormal(SD = 0.2 yr^-1).
+- Residual model-discrepancy SD: HalfNormal(SD = 1.5 mg/L), with an additional assumed measurement SD = 0.2 mg/L.
+- Gamma shape: log(alpha) ~ Normal(log(median), 1.3), alpha restricted to 0.25–500. **Three median scenarios 2, 10 and 50** measure sensitivity to this consequential prior.
+
+The script runs four independent MCMC chains per full-data scenario and a basic split-Rhat check. It repeats the reference piston and median-10 gamma posteriors without site 2801, and runs grouped five-fold held-out comparisons for piston and all three gamma priors (using two shorter chains per fold). Output tables are:
+- outputs/bayesian_age_parameter_posterior_summary.csv
+- outputs/bayesian_age_parameter_convergence.csv
+- outputs/bayesian_age_parameter_correlations.csv
+- outputs/bayesian_age_parameter_CV_predictions.csv
+- outputs/bayesian_age_parameter_CV_summary.csv
+
+Figures are:
+- plots/bayesian_age_parameter_k_intervals.png
+- plots/bayesian_age_parameter_alpha_prior_sensitivity.png
+- plots/bayesian_age_parameter_CV.png
+
+**Independent Python numerical test, not yet executed as R:** Gamma alpha posterior medians are approximately 5.0, 12.8, and 47.3 for alpha prior medians 2, 10, and 50. Corresponding k posterior medians are approximately 0.083, 0.077, and 0.072 yr^-1. The piston-flow Bayesian k posterior median is about 0.070 yr^-1. Under the median-10 prior, k 95% CrI is about 0.059–0.106 and alpha about 2.3–128. Basic split-Rhat values for the independent Python chains were <1.01. The independent Python grouped CV had RMSE 1.173 mg/L (piston) versus 1.189 mg/L (gamma, prior median 10), a **small difference**; the R implementation uses its own randomized fold arrangement, so compare its generated results rather than treating the Python scores as R outputs.
+
+**Conclusion:** alpha and k are negatively correlated. DO and MRT data poorly identify groundwater age-distribution width without independent constraints: alpha posteriors shift considerably with alpha priors. k is more stable but its uncertainty broadens when alpha is allowed to vary. This analysis does **not** establish the physical location of oxygen depletion or account for uncertainty in mixing fractions and MRT. No groundwater samples are uploaded to the public repository.
