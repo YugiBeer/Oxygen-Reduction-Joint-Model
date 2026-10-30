@@ -118,7 +118,7 @@ predictions <- read_csv(
 
 model_names <- c(
   aquifer_only = "Aquifer only",
-  infiltration_only = "Recharge loss only",
+  infiltration_only = "LSR DO deficit only",
   combined = "Combined"
 )
 
@@ -628,8 +628,8 @@ p4 <- ggplot(
     caption = paste(
       "Bars represent the source-weighted initial DO,",
       "partitioned into remaining DO and two inferred losses.",
-      "Recharge-associated loss is not independently",
-      "identified as infiltration-pathway consumption."
+      "The LSR-associated DO deficit is inferred from the fit;",
+      "it is not a direct measurement of infiltration loss."
     )
   )
 
