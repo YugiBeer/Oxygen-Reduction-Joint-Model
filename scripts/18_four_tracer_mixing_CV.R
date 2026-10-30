@@ -29,7 +29,18 @@
 #
 # Outputs are LOCAL and gitignored; never commit private site records.
 library(tidyverse)
-setwd(here::here("Oxygen-Reduction-Joint-Model"))
+# Accept either the repository root or its immediate parent as WD.
+# Avoid here::here("Oxygen-Reduction-Joint-Model"), which adds an
+# incorrect subdirectory when Positron is already at the repo root.
+if (file.exists("stan/18_four_tracer_joint_mixing.stan")) {
+  # Already in project root.
+} else if (file.exists(
+  "Oxygen-Reduction-Joint-Model/stan/18_four_tracer_joint_mixing.stan"
+)) {
+  setwd("Oxygen-Reduction-Joint-Model")
+} else {
+  stop("Open Oxygen-Reduction-Joint-Model as your working directory.")
+}
 
 cfg <- list(
   input = if (file.exists("data/Uwe_HP_data_prepared.csv")) {
