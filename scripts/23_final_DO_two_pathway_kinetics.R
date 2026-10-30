@@ -114,6 +114,29 @@ message(
 )
 dir.create("outputs",recursive=TRUE,showWarnings=FALSE)
 dir.create("plots",recursive=TRUE,showWarnings=FALSE)
+# Explicit BC audit: these are assumptions or posterior variables,
+# never independent measurement evidence.
+write_csv(
+  tibble(
+    boundary=c("rainfall_surface","river_aquifer_entry",
+               "LSR_water_table","aquifer"),
+    DO_mgL=c(Csat,cfg$river_DO_boundary,NA_real_,NA_real_),
+    source=c("fixed_saturation_assumption",
+             "fixed_7p5_mgL",
+             "posterior_uncertain",
+             "posterior_reaction_coefficient"),
+    note=c(
+      paste0("T_recharge=",cfg$recharge_temperature_C,
+             " deg C, pressure ratio=",
+             cfg$atmospheric_pressure_ratio),
+      "2801 model-only DO is 7.5 and excluded from fitting",
+      "LSR at water table is Csat multiplied by posterior survival",
+      paste0("Zero/first-order k_ref prior common at ",
+             cfg$C_ref," mg/L")
+    )
+  ),
+  "outputs/final_DO_23_boundary_conditions.csv"
+)
 
 raw <- readr::read_csv(
   cfg$input,show_col_types=FALSE,
@@ -216,8 +239,7 @@ posterior95 <- function(fit,vars) {
 names_global <- c(
   "river_DO","survival_LSR","LSR_DO_at_water_table",
   "LSR_DO_deficit","k_ref","sigma_DO",
-  "k_aquifer_zero_order_mg_L_yr",
-  "k_aquifer_first_order_yr_inv",
+  "aquifer_rate_actual",
   "LSR_zero_order_exposure","LSR_first_order_exposure",
   "mean_vadose_LSR_DO_loss","mean_aquifer_DO_loss",
   "sampled_well_vadose_loss_fraction",
@@ -264,7 +286,15 @@ for (order in 0:1) {
           if (order==0) " (zero-order)" else " (first-order)")
   fit <- sample_model(order)
   post[[order+1L]] <- posterior95(fit,names_global) %>%
-    mutate(aquifer_order=order,.before=1)
+    mutate(
+      aquifer_order=order,
+      kinetic_rate_units=if_else(
+        variable=="aquifer_rate_actual",
+        if (order==0) "mg/L/year" else "year^-1",
+        NA_character_
+      ),
+      .before=1
+    )
   diag[[order+1L]] <- select_diag(fit,order)
   w <- fit$summary(variables=c(
     "f_LSR","true_MRT","mean_DO",
@@ -532,6 +562,7 @@ print(main %>% filter(
   variable %in% c(
     "river_DO","survival_LSR",
     "LSR_DO_at_water_table","LSR_DO_deficit","k_ref",
+    "aquifer_rate_actual",
     "mean_vadose_LSR_DO_loss","mean_aquifer_DO_loss",
     "sampled_well_vadose_loss_fraction"
   )
