@@ -565,3 +565,62 @@ Excluding the four wells used to define the original endmembers (2801, 1032, 429
 **Crucial local-input warning:** The older oxygen-project \`data/groundwater.csv\` is a **42-row reduced dataset without Na**. Script 18 now prefers local \`data/Uwe_HP_data_prepared.csv\` and gives an actionable error if sodium is missing. This 43-record dataset is stored in the user's **PRIVATE** original \`Lincoln-Environmental/Oxygen-Reduction\` repository under \`data/Uwe_HP_data_prepared.csv\`. Copy it into the public modelling repo's local \`data/\` folder without committing it. Keep all groundwater data files private and gitignored.
 
 **Research interpretation:** Sodium adds predictive hydrochemical information to this formulation and sharpens mixing fractions, but Na can be modified by cation exchange; the uncertain conditional Na–Cl residual correlation and study-derived endmembers limit causal interpretation. The true physical LSR fractions cannot be independently validated from internal held-out tracer scores. Confirm with a compiled Stan run, a wider-endmember sensitivity, posterior predictive coverage and ideally external endmember time series (especially rainfall isotope composition) before transferring these fractions into the formal Bayesian oxygen budget.
+
+
+## Fully joint Bayesian DO refit: three versus four tracers (script 19)
+
+**Question:** Does the sodium-related reduction in posterior source-mixing uncertainty constrain LSR-associated oxygen depletion separately from the apparent age-dependent DO coefficient, *and* does it improve held-out groundwater DO prediction?
+
+### Design
+
+- `stan/19_joint_three_vs_four_tracer_DO.stan` — identical two-recharge-source joint models distinguished by `use_na=0` (δ18O, chloride, excess air) versus `use_na=1` (add Na). Both include uncertain tracer endmembers, per-well fLSR, fLSR-dependent isotope endmember variability, mean-centred uncertain true MRT, river entry DO, common effective LSR entry DO, and k. Na and Cl use a **joint correlated likelihood**, not an independently counted Na/Cl ratio.
+- `scripts/19_joint_three_vs_four_tracer_DO.R` — fits two 4-chain full models, exports global and per-well posteriors with MCMC diagnostics, and runs **five-fold matched grouped held-out DO validation** with the same wells, DO priors and MRT assumptions. Held-out DO is removed from the Stan likelihood and **zeroed in its data input**; source tracers and reported MRT remain available for held-out wells. Posterior predictive DO intervals include Gaussian observation discrepancy.
+- The original **private** `data/Uwe_HP_data_prepared.csv` is required, not the reduced oxygen-workflow CSV lacking sodium. The private input is gitignored. Current prepared data: **43 samples, 42 with DO+MRT**, compared with 41 in an earlier reduced dataset. The river-endmember site 2801 has DO 10.2 mg/L and reported MRT 0; this challenges the river entry DO prior centred at 7.5 mg/L. Script 19 has an optional flag to exclude only that DO observation in a sensitivity fit; baseline retains it.
+
+Run in Positron from the repository root after installing CmdStanR, CmdStan and posterior:
+
+```r
+source("scripts/19_joint_three_vs_four_tracer_DO.R")
+```
+
+The default performs **12 Stan fits** (two full and ten grouped CV), which is computationally expensive. Set `cfg$run_CV=FALSE` for the two full fits first or `cfg$run_only_fold=1L` for a CV smoke test. Setting `cfg$run_prior_sensitivity=TRUE` also fits the four-tracer model with doubled endmember prior SDs. The default common LSR entry DO prior is Uniform(0,9.5) mg/L; the pre-infiltration LSR oxygen reference 9.5 mg/L is **assumed**, not measured.
+
+Local (gitignored) outputs include:
+- `outputs/joint_DO_19_posterior_parameters.csv` — median and central 95% credible intervals.
+- `outputs/joint_DO_19_per_well_posterior.csv` — site-specific source fractions, DO and partition component summaries.
+- `outputs/joint_DO_19_source_fraction_change.csv`.
+- `outputs/joint_DO_19_CV_scores.csv`, `outputs/joint_DO_19_CV_predictions.csv`, `outputs/joint_DO_19_CV_paired_errors.csv`.
+- `outputs/joint_DO_19_full_diagnostics.csv`, `outputs/joint_DO_19_CV_diagnostics.csv`.
+- `outputs/joint_DO_19_full_Na0.rds`, `outputs/joint_DO_19_full_Na1.rds` (posterior draws retained locally).
+- `plots/joint_DO_19_posterior_comparison.png`, `plots/joint_DO_19_grouped_CV_predictions.png`.
+
+### Independent numerical execution (31 October 2026): provisional
+
+The same full joint source-tracer/DO/age model was independently implemented in Python with **21-node Gauss–Legendre integration over per-well fLSR**, **five-node age integration**, and **four-chain adaptive multivariate Metropolis sampling of shared model parameters**. Posterior latent f and age were also explicitly sampled conditionally when reporting per-well mixing fractions and modelled DO losses. This is a genuine Bayesian posterior approximation, **not a Stan/HMC run**; it uses a constant excess-air analytical SD of 0.15 instead of per-well values. The independent run uses mean-centred lognormal MRT log SD 0.25, the same empirical endmember prior centres, and the common beta(1,1) LSR entry DO prior. All private per-well draws/observations are kept off public GitHub.
+
+**Full-data posterior comparison (approximate 95% credible intervals):**
+
+| Quantity | 3 tracer | 4 tracer |
+|---|---:|---:|
+| Apparent k (yr^-1) | **0.074** (0.051–0.104) | **0.074** (0.050–0.105) |
+| Effective LSR DO deficit (mg/L) | **2.47** (0.13–7.02) | **2.17** (0.15–6.15) |
+| Arithmetic mean modelled LSR-pathway DO loss per well (mg/L) | 0.70 (0.04–2.01) | 0.59 (0.04–1.68) |
+| Arithmetic mean apparent age-associated DO loss per well (mg/L) | 4.54 (3.23–5.81) | 4.53 (3.17–5.79) |
+| Approximate LSR share of modelled losses averaged across sampled wells | 0.131 (0.008–0.364) | 0.117 (0.007–0.329) |
+
+These modelled loss fractions are **not volume-weighted catchment or aquifer oxygen budgets**; they are averages over a nonrandom set of wells. An apparent age-associated loss is not proof of oxygen consumption exclusively in the saturated aquifer. The LSR DO deficit is strongly prior-sensitive and depends on the assumed 9.5 mg/L reference.
+
+Adding Na reduced the median site-level fLSR 95% posterior interval width from ~**0.172** to ~**0.108**, with a median absolute change in posterior mean fraction of ~**0.014**. This improvement in precision depends on the assumed source mixing model and Na transport behavior.
+
+**Five-fold matched held-out DO predictions (42 wells; fold sizes 9/9/8/8/8):**
+
+| Model | RMSE DO (mg/L) | MAE DO (mg/L) |
+|---|---:|---:|
+| 3 tracer | **1.8458** | **1.3196** |
+| 4 tracer | 1.8461 | 1.3214 |
+
+The 4–3 difference in RMSE is **+0.00035 mg/L**, essentially zero. Among 42 held-out wells, the 4-tracer model has lower absolute error in 20 and higher error in 22. This differs from older DO-CV figures for differently screened data and models; compare ONLY the matched conditions above.
+
+**Convergence caveat:** the independent Python full-model maximum split-Rhat was approximately 1.058 for the 3-tracer global parameters and 1.285 for the 4-tracer parameters. The largest issues concerned isotope heterogeneity, ion-correlation and other tracer nuisance variables; full-model k split-Rhat was 1.005 (three) / 1.018 (four), and LSR DO 1.014 / 1.005. Some grouped CV tracer nuisance parameters had split-Rhat **as large as 1.53**, although the key k/LSR DO parameters showed substantially better agreement. This means the full inference **has not passed convergence checks**, and the numeric confidence intervals and tiny CV differences are **provisional**. The independent numerical approximation does NOT validate the still-uncompiled R/Stan fit, which may give different numerical results.
+
+**Scientific conclusion, conditional on assumptions:** Sodium sharpens estimated source fractions, but the inferred LSR DO deficit is still broad and dependent on its prior; k and held-out DO predictive error are essentially unchanged. Better source mixing alone is insufficient to identify the physical oxygen-consumption partition. Validate the Stan fits and then focus on source-entry DO and variation in reaction/groundwater-age processes, rather than adding another weakly constrained tracer term.
