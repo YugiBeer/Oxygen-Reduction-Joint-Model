@@ -624,3 +624,49 @@ The 4–3 difference in RMSE is **+0.00035 mg/L**, essentially zero. Among 42 he
 **Convergence caveat:** the independent Python full-model maximum split-Rhat was approximately 1.058 for the 3-tracer global parameters and 1.285 for the 4-tracer parameters. The largest issues concerned isotope heterogeneity, ion-correlation and other tracer nuisance variables; full-model k split-Rhat was 1.005 (three) / 1.018 (four), and LSR DO 1.014 / 1.005. Some grouped CV tracer nuisance parameters had split-Rhat **as large as 1.53**, although the key k/LSR DO parameters showed substantially better agreement. This means the full inference **has not passed convergence checks**, and the numeric confidence intervals and tiny CV differences are **provisional**. The independent numerical approximation does NOT validate the still-uncompiled R/Stan fit, which may give different numerical results.
 
 **Scientific conclusion, conditional on assumptions:** Sodium sharpens estimated source fractions, but the inferred LSR DO deficit is still broad and dependent on its prior; k and held-out DO predictive error are essentially unchanged. Better source mixing alone is insufficient to identify the physical oxygen-consumption partition. Validate the Stan fits and then focus on source-entry DO and variation in reaction/groundwater-age processes, rather than adding another weakly constrained tracer term.
+
+
+## Paired Bayesian prediction of DO and excess N₂ (script 20)
+
+**31 October 2026 — new joint experiment.** This tests whether the reactive gas signature adds information to the apparent oxygen-depletion history and improves predictive performance, rather than simply adding another conservative mixing tracer. The mixing model still has **two recharge sources and four mixing tracers** (δ18O, Cl, Na, excess air). Excess N₂ is a **separate reactive outcome**; its response is NOT a stoichiometric measurement of oxygen depletion.
+
+New files:
+- `stan/20_joint_paired_DO_excessN2.stan` — DO + N₂ joint likelihood with four-tracer mixing, Na–Cl residual correlation, source isotope variability and mean-centred uncertain true MRT.
+- `scripts/20_joint_paired_DO_excessN2.R` — full-data posterior comparison and paired five-fold holdout of **BOTH DO and excess N₂** at exactly the same wells, retaining measured conservative tracers and reported MRT. Produces pair-specific predictive scores, uncertainty coverage, well-specific modelled depletion and convergence diagnostics.
+
+Three competing models for **excess N₂**, plus a DO-only reference:
+1. **DO_only**: unchanged four-tracer joint oxygen model; excess-N₂ measurements not used.
+2. **N2_age**: excess N₂ as a study-conditional source/background plus β_age log(1 + true MRT). This is an empirical **uncoupled** reference.
+3. **N2_DOloss**: baseline + positive β_link times the **modelled apparent cumulative DO depletion**. This extra coupling is a statistical association, **not an O₂/N₂ reaction stoichiometry**.
+4. **N2_lowDO**: baseline + positive β_link times the modelled residence duration below a **fixed** DO threshold, default 2 mg/L (expressed in multiples of 20 years). Evaluate thresholds 1, 2, and 3 mg/L. This assumes a highly simplified piston-flow DO trajectory and does **not** capture microscale oxic/anoxic conditions.
+
+Excess N₂ has a **Student-t(df=4)** observation likelihood with the provided `xs_N2_sig` and separately estimated extra discrepancy SD, so a single unusual N₂ measurement is not forced to determine the rate. This is a robust statistical approximation; negative tails of replicated N₂ should not be interpreted as physically meaningful negative denitrification. The n2_R/n2_LSR terms model source-associated background differences *empirically*; they do not assert excess N₂ is conservative. No measured nitrate, derived `initial_NO3N` or derived `reaction_progress` is used as a predictor. The latter two already contain the excess-N₂ observation, and would be **data leakage** during held-out N₂ prediction. Nitrate availability at recharge, redox microenvironments, and other electron-acceptor reactions remain unobserved limitations.
+
+**Run in Positron** with the original private `data/Uwe_HP_data_prepared.csv` and CmdStanR/CmdStan installed:
+
+```r
+source("scripts/20_joint_paired_DO_excessN2.R")
+```
+
+Default fits four four-chain full-data models and 20 four-chain grouped-CV fits. To reduce computation, set `cfg$run_CV=FALSE` for the full posterior comparison only, or `cfg$run_only_fold=1L` for a single validation fold. The script's `cfg$exclude_16758=TRUE` option reruns everything without site 16758, which reports **excess N₂ 8.8, DO 0.3 mg/L, MRT 70 years**. The full original dataset has 43 records, of which 42 have usable DO, excess N₂ and MRT (Frimley lacks MRT). Excluding 16758 leaves 41 usable samples. `cfg$low_DO_threshold` allows 1, 2 and 3 mg/L threshold tests. Results have descriptive filenames incorporating the n, outlier exclusion and threshold.
+
+Outputs are **local, gitignored**:
+- `outputs/joint_DO_N2_20_full_posteriors_*`, `joint_DO_N2_20_per_well_*`, `joint_DO_N2_20_convergence_*`.
+- `outputs/joint_DO_N2_20_CV_predictions_*`, `joint_DO_N2_20_CV_summary_*`, `joint_DO_N2_20_CV_diagnostics_*`.
+- `plots/joint_DO_N2_20_CV_*`, `plots/joint_DO_N2_20_posterior_*`.
+
+### Independent preliminary paired-CV screening (not Bayesian)
+
+A separate Python SciPy **regularized nonlinear least-squares** screen used private 42-well DO, MRT, excess N₂ and fixed source fractions inferred from the independent four-tracer **tracer-only** model. It compared the age-only N₂ reference with the cumulative DO-loss and post-2-mg/L-exposure additions. **Both outcomes were held out together** in five matched grouped folds. It does not propagate fLSR, age or endmember posterior uncertainty, and it uses an approximately Gaussian N₂ discrepancy rather than the new Student-t likelihood. Consequently it must not be conflated with the Stan posterior or the previous full joint Bayesian results.
+
+| Model | DO RMSE (mg/L) | excess N₂ RMSE (dataset units) |
+|---|---:|---:|
+| Uncoupled source + age | **1.713** | 1.369 |
+| + apparent cumulative DO loss | 1.716 | 1.380 |
+| + duration below 2 mg/L DO | 1.718 | **1.350** |
+
+The slight ~0.019 N₂ RMSE improvement in the low-DO model is not convincing, especially because it worsens DO prediction very slightly. **Excluding site 16758 (n=41)** produced excess-N₂ RMSE **0.734, 0.737 and 0.736** for the three models respectively, and DO RMSE **1.733, 1.733, 1.732**, so no systematic advantage remains. These 41-well results are a second controlled validation, not evidence that 16758 is erroneous.
+
+This outcome is scientifically plausible. Excess N₂ reports accumulated nitrate reduction, requiring nitrate availability, and can persist after oxygen concentrations change or water bodies mix. Present well DO does not measure how much reduction occurred over the groundwater history. An empirical N₂ response term is not a physical oxygen-budget constraint. **N₂ may inform source mixing/age or redox propensity without necessarily constraining effective LSR entry DO, k, or their partition uniquely**.
+
+**Validation status:** The two Stan/R files are committed and have been structurally reviewed, but not executed/compiled in this environment. No Stan posterior credible interval or 5-fold Bayesian prediction score is yet available. Review chain Rhat, bulk ESS, divergences, threshold sensitivity, and results with/without well 16758 before treating joint predictions as evidence of identifiable redox pathways.
