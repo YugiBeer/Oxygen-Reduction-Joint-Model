@@ -1,5 +1,19 @@
 # Oxygen Reduction — Joint Model
 
+
+## Recharge terminology
+
+Throughout this analysis, **infiltration** refers specifically to the **land-surface recharge (LSR)** pathway (soil and unsaturated-zone percolation). The distinct **river-recharge** pathway is water derived from the river. Do not describe oxygen loss associated with river recharge as "infiltration loss."
+
+- **River DO (monitoring reference):** measured river-water DO, represented centrally by 7.5 mg/L.
+- **River-recharge DO at aquifer entry:** effective DO of the river-derived component entering the regional groundwater system; not directly measured.
+- **River-recharge DO deficit:** monitored-river DO minus river-recharge DO at aquifer entry; a scenario parameter **not a measured riverbed reaction loss**. It could reflect riverbed passage and other source/boundary-condition differences.
+- **Effective LSR DO:** land-surface-derived recharge DO at aquifer entry after any soil/unsaturated-zone consumption.
+- **Apparent age-dependent reduction:** DO depletion associated with groundwater MRT; it does not uniquely locate oxygen consumption in the saturated aquifer.
+
+Script 07 retains its original `07_infiltration_loss_sensitivity.R` filename and `infiltration_*.csv/png` output filenames **only for backwards compatibility**. Plot titles, model labels, tabular variables and scientific interpretation use the corrected terminology.
+
+
 A standalone two-script workflow for the 30 October 2026 Heretaunga groundwater analysis. It is independent of the earlier **fixed-rainfall-DO** rate calculations.
 
 ## Files
@@ -24,14 +38,14 @@ Results are written to `outputs/` and figures to `plots/`. These directories are
 - Mixing uses site 2801 as the river **tracer endpoint**, and 1032, 4294 and the 108 m HB Prison sample as the land-surface **tracer endpoint**.
 - For each well, the median of the clipped rainfall fractions from δ¹⁸O, chloride and excess air is used. Reliability requires all three tracers and a range of **unclipped** fractions ≤ 0.35. No minimum river recharge fraction.
 - 29 of 42 records pass the production screen (five rainfall-dominated).
-- River DO = 7.5 mg/L; **assumed** pre-infiltration rainfall DO reference = 9.5 mg/L.
+- Monitored river DO reference = 7.5 mg/L; **assumed** pre-infiltration *land-surface recharge* DO reference = 9.5 mg/L.
 - For the first-order model:
   
   DO_pred = [fR * 7.5 + fP * (9.5 - L)] * exp(-k * MRT)
 
   L and k are fitted together. For zero-order reduction, the post-mixing concentration is reduced by k * MRT, bounded below by zero.
 
-Only **effective** rainfall-source DO (9.5 - L) is constrained by the data. An inferred source-associated deficit cannot, by itself, be assigned uniquely to infiltration or the unsaturated zone. The first-order rate is an apparent residence-time-dependent rate, not independent proof of saturated-zone reaction.
+Only **effective** rainfall-source DO (9.5 - L) is constrained by the data. An inferred land-surface source-associated deficit cannot, by itself, be assigned specifically to soil or unsaturated-zone oxygen consumption. The first-order rate is an apparent residence-time-dependent rate, not independent proof of saturated-zone reaction.
 
 Excess air is inferred from dissolved gases; its treatment as a conservative mixing tracer is an **assumption needing investigation**. This analysis does not model excess N₂ or denitrification kinetics.
 
@@ -65,7 +79,7 @@ The between-sample source DO values are Gaussian random effects that are *integr
 
 In addition to the baseline priors, a wider prior scenario tests k sensitivity to the assumptions. The script produces posterior summaries, a simple four-chain R-hat check, **matched five-fold cross-validated** predictive RMSE and log score, and diagnostic PNG plots. The cross-validation refits both models using only the training folds.
 
-**Scientific limitation:** These models assume initial recharge DO variability is statistically independent of groundwater mean residence time, conditional on mixing fraction. A positive k establishes a need for *age-associated* depletion under those assumptions. It does **not** establish the site of oxygen consumption (infiltration pathway versus saturated aquifer). The three-tracer recharge fractions are held fixed; excess-air tracer suitability and source fraction uncertainty are not propagated here.
+**Scientific limitation:** These models assume initial recharge DO variability is statistically independent of groundwater mean residence time, conditional on mixing fraction. A positive k establishes a need for *age-associated* depletion under those assumptions. It does **not** establish the site of oxygen consumption (recharge pathways versus saturated-aquifer transport). The three-tracer recharge fractions are held fixed; excess-air tracer suitability and source fraction uncertainty are not propagated here.
 
 The initial posterior and predictive comparison was cross-checked using a separate Python implementation. **The R script has not been executed in this environment** and should be run in Positron.
 
@@ -98,7 +112,7 @@ Outputs:
 - plots/confounding_DO_MRT_by_confinement.png
 - plots/confounding_group_CV_DO.png
 
-**Structural non-identifiability:** An alternative model in which river- and rainfall-recharge DO at entry vary as `R_i = R exp(-b MRT_i)` and `P_i = P exp(-b MRT_i)` produces *exactly the same predictions* as a first-order transport attenuation model with k=b. Fitted DO–MRT observations alone cannot locate oxygen reduction in the infiltration zone versus the saturated aquifer.
+**Structural non-identifiability:** An alternative model in which river- and rainfall-recharge DO at entry vary as `R_i = R exp(-b MRT_i)` and `P_i = P exp(-b MRT_i)` produces *exactly the same predictions* as a first-order transport attenuation model with k=b. Fitted DO–MRT observations alone cannot locate oxygen depletion along recharge pathways versus subsequent saturated-aquifer transport.
 
 The confinement-group analysis was calculated independently in Python for checking. The R script must still be run and diagnosed in Positron. The Bayesian random effects are Gaussian and can imply unphysical negative inlet DO at extreme tails; physical constraints and independent recharge DO observations would improve the next model.
 
@@ -122,10 +136,10 @@ The same six model variants are fitted and compared using matched five-fold cros
 - `plots/age_adjusted_river_prior_k.png`
 - `plots/age_adjusted_river_prior_CV.png`
 
-**Interpret carefully:** Only site 2801 has MRT=0 in the current 29-well selection; the remaining MRTs are ≥1 year. The year-specific attenuation is an assumed travel-time response; MRT alone does not determine dispersion or attenuation. Piston flow would simply delay the sinusoid. The daily-mean variance split cannot be estimated from the 29 well DO measurements, and should be constrained by time-frequency analysis of the actual river record where possible. The age term still cannot distinguish infiltration loss from saturated-aquifer reaction. The code is supplied for execution in Positron; the equivalent numerical sensitivity was independently evaluated in Python, but this R script has not been run here.
+**Interpret carefully:** Only site 2801 has MRT=0 in the current 29-well selection; the remaining MRTs are ≥1 year. The year-specific attenuation is an assumed travel-time response; MRT alone does not determine dispersion or attenuation. Piston flow would simply delay the sinusoid. The daily-mean variance split cannot be estimated from the 29 well DO measurements, and should be constrained by time-frequency analysis of the actual river record where possible. The age term still cannot distinguish oxygen depletion along recharge pathways from subsequent saturated-aquifer reaction. The code is supplied for execution in Positron; the equivalent numerical sensitivity was independently evaluated in Python, but this R script has not been run here.
 
 
-## Riverbed oxygen-loss sensitivity and infiltration-only bounds (script 07)
+## River-derived recharge DO deficit: sensitivity and lower bounds (script 07)
 
 Run after the three-tracer mixing model:
 
@@ -134,11 +148,11 @@ source("scripts/01_three_tracer_mixing.R")
 source("scripts/07_infiltration_loss_sensitivity.R")
 ```
 
-Script 07 tests the remaining major uncertainty in the apparent oxygen reduction rate: the river's monitoring DO (reference 7.5 mg/L) is **not** necessarily the DO entering the saturated aquifer after riverbed infiltration.
+Script 07 tests the remaining major uncertainty in the apparent oxygen reduction rate: the river's monitoring DO (reference 7.5 mg/L) is **not** necessarily the DO entering the saturated aquifer after passage through riverbed and connected sediments.
 
-- Fix riverbed oxygen loss at 0–7.5 mg/L in 0.25 mg/L increments; for each fixed loss refit effective rainfall-recharge DO (0–9.5 mg/L) and first-order age coefficient k. Repeat all fits **with and without** young, high-DO site 2801.
+- Assume a river-derived recharge DO deficit of 0–7.5 mg/L in 0.25 mg/L increments relative to monitored river DO; for each assumed deficit refit effective land-surface recharge DO (0–9.5 mg/L) and first-order age coefficient k. Repeat all fits **with and without** young, high-DO site 2801.
 - Use grouped five-fold CV (related Eastbourne, Gilbertson and Flaxmere wells together), reporting within-sample and held-out RMSE separately.
-- Independently calculate the *minimum* riverbed oxygen loss each well requires if **no loss occurs after infiltration**, allowing its rainfall-derived water to be entirely anoxic. This is an extremely favourable assumption for the infiltration-only explanation: oxygen in rainfall recharge would require yet more loss from the river component.
+- Calculate the **minimum river-derived recharge DO deficit** required for each well if **no age-dependent loss occurs after recharge entry**, allowing the land-surface recharge component to be entirely anoxic. This favours the no-aquifer-reduction explanation; oxygen remaining in land-surface recharge would require a larger deficit in the river component.
 - Repeat required-loss calculation for river references 5.6, 7.5 and 9.4 mg/L. Flag samples, notably site 2801 at 7.5 mg/L, whose DO exceeds the maximum implied by these fixed source bounds. A river sample can temporarily exceed its long-run mean; this is not evidence of oxygen production in the aquifer.
 - Compare physically bounded k=0 models with shared effective source DO, with different river DO for confined versus unconfined wells, or with **both river and rainfall effective DO varying by confinement**; contrast these against an age-dependent model with river mean fixed at 7.5 mg/L.
 
@@ -154,4 +168,4 @@ Output figures:
 - `plots/infiltration_profile_k.png`
 - `plots/infiltration_minimum_loss_by_age.png`
 
-**Inference limit:** The minimum-loss calculation identifies what a no-aquifer-reduction explanation *requires*, not where consumption actually happened. The confinement model only tests a coarse proxy for variable infiltration conditions; no coordinates or independent infiltration DO observations are available. If initial DO is permitted to vary systematically with MRT, a sufficiently flexible infiltration-only model can be exactly equivalent to the first-order age model. The independent Python calculations provide numerical results; run the R script in Positron to verify its outputs. Raw groundwater data have not been committed.
+**Inference limit:** The minimum-deficit calculation identifies what a no-age-dependent-reduction explanation *requires*, not where oxygen consumption occurred. The confinement model is only a crude proxy for differences in recharge entry conditions; no independent recharge-entry DO measurements are available. If initial recharge DO is permitted to vary systematically with MRT, a sufficiently flexible recharge-entry-only model can be exactly equivalent to the first-order age model. The independent Python calculations provide numerical results; run the R script in Positron to verify its outputs. Raw groundwater data have not been committed.
