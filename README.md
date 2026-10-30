@@ -68,3 +68,36 @@ In addition to the baseline priors, a wider prior scenario tests k sensitivity t
 **Scientific limitation:** These models assume initial recharge DO variability is statistically independent of groundwater mean residence time, conditional on mixing fraction. A positive k establishes a need for *age-associated* depletion under those assumptions. It does **not** establish the site of oxygen consumption (infiltration pathway versus saturated aquifer). The three-tracer recharge fractions are held fixed; excess-air tracer suitability and source fraction uncertainty are not propagated here.
 
 The initial posterior and predictive comparison was cross-checked using a separate Python implementation. **The R script has not been executed in this environment** and should be run in Positron.
+
+
+## Confounding test: age versus recharge-pathway differences
+
+Run after script 01:
+
+```r
+source("scripts/01_three_tracer_mixing.R")
+source("scripts/05_recharge_pathway_confounding.R")
+```
+
+Script 05 fits four models, using the same hierarchical DO priors as script 04:
+
+1. Source DO uncertainty alone, no age term.
+2. Separate mean effective source DO for confined and unconfined wells, no age term.
+3. Uncertain source DO plus first-order age term.
+4. Both confinement-related source DO differences and first-order age term.
+
+These *confinement-related differences* are a proxy sensitivity analysis, **not** proof that the recharge pathway is different or that depletion took place before water reached the aquifer.
+
+Confinement and age are correlated; 29 wells include related Eastbourne, Gilbertson and Flaxmere observations. Therefore script 05 uses **grouped five-fold CV**, keeping these obvious groups together. Grouping by name is a heuristic, not a spatial or temporal independence guarantee.
+
+Outputs:
+- outputs/confounding_posterior_summary.csv
+- outputs/confounding_group_CV_predictions.csv
+- outputs/confounding_group_CV_summary.csv
+- outputs/confounding_within_group_correlations.csv
+- plots/confounding_DO_MRT_by_confinement.png
+- plots/confounding_group_CV_DO.png
+
+**Structural non-identifiability:** An alternative model in which river- and rainfall-recharge DO at entry vary as `R_i = R exp(-b MRT_i)` and `P_i = P exp(-b MRT_i)` produces *exactly the same predictions* as a first-order transport attenuation model with k=b. Fitted DO–MRT observations alone cannot locate oxygen reduction in the infiltration zone versus the saturated aquifer.
+
+The confinement-group analysis was calculated independently in Python for checking. The R script must still be run and diagnosed in Positron. The Bayesian random effects are Gaussian and can imply unphysical negative inlet DO at extreme tails; physical constraints and independent recharge DO observations would improve the next model.
