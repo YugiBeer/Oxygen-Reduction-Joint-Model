@@ -252,18 +252,28 @@ select_diag <- function(fit,order,fold=0L,held=NULL) {
            paste0("true_MRT[",held,"]"))
   z <- fit$summary(variables=c(names_global,extra))
   hm <- fit$diagnostic_summary()
+  n_div <- sum(hm$num_divergent,na.rm=TRUE)
+  n_tree <- if ("num_max_treedepth" %in% names(hm))
+    sum(hm$num_max_treedepth,na.rm=TRUE) else NA_integer_
+  min_ebfmi <- if ("ebfmi" %in% names(hm))
+    suppressWarnings(min(hm$ebfmi,na.rm=TRUE)) else NA_real_
   bad <- any(z$rhat>cfg$max_rhat,na.rm=TRUE) ||
     any(z$ess_bulk<cfg$min_bulk_ESS,na.rm=TRUE) ||
-    any(hm$num_divergent>0,na.rm=TRUE)
+    n_div>0 ||
+    (!is.na(n_tree) && n_tree>0) ||
+    (is.finite(min_ebfmi) && min_ebfmi<.3)
   if (bad) warning(
     "MCMC diagnostics not acceptable: order=",order,
     " fold=",fold,
-    " (review Rhat, ESS, divergences before inference)."
+    " (review Rhat, ESS, divergences, treedepth, E-BFMI)."
   )
   z %>%
     mutate(
       aquifer_order=order,fold=fold,
-      any_divergence=any(hm$num_divergent>0),
+      n_divergences=n_div,
+      n_max_treedepth=n_tree,
+      min_ebfmi=min_ebfmi,
+      all_diagnostics_pass=!bad,
       .before=1
     )
 }
@@ -401,6 +411,25 @@ for (order in 0:1) {
 }
 main <- bind_rows(post)
 write_csv(main,"outputs/final_DO_23_global_posteriors.csv")
+full_diagnostic_pass <- bind_rows(diag) %>%
+  group_by(aquifer_order) %>%
+  summarise(
+    max_rhat=max(rhat,na.rm=TRUE),
+    min_bulk_ESS=min(ess_bulk,na.rm=TRUE),
+    n_divergences=max(n_divergences,na.rm=TRUE),
+    n_max_treedepth=max(n_max_treedepth,na.rm=TRUE),
+    all_diagnostics_pass=all(all_diagnostics_pass),
+    .groups="drop"
+  )
+write_csv(
+  full_diagnostic_pass,"outputs/final_DO_23_fit_status.csv"
+)
+if (any(!full_diagnostic_pass$all_diagnostics_pass)) {
+  warning(
+    "AT LEAST ONE FULL FIT FAILED SAMPLING CHECKS. ",
+    "Joint posteriors are exploratory until corrected."
+  )
+}
 p_joint <- bind_rows(joint_draws) %>%
   ggplot(aes(LSR_DO_deficit_mg_L,aquifer_rate))+
   geom_point(alpha=.12,size=.65)+
@@ -513,6 +542,22 @@ if (cfg$run_CV) {
       .groups="drop"
     )
   write_csv(scores,"outputs/final_DO_23_cv_scores.csv")
+  cv_diagnostic_pass <- bind_rows(cvdiag) %>%
+    group_by(aquifer_order) %>%
+    summarise(
+      max_rhat=max(rhat,na.rm=TRUE),
+      min_bulk_ESS=min(ess_bulk,na.rm=TRUE),
+      n_divergences=max(n_divergences,na.rm=TRUE),
+      all_diagnostics_pass=all(all_diagnostics_pass),
+      .groups="drop"
+    )
+  write_csv(
+    cv_diagnostic_pass,"outputs/final_DO_23_cv_fit_status.csv"
+  )
+  if (any(!cv_diagnostic_pass$all_diagnostics_pass)) warning(
+    "DO NOT SELECT KINETIC ORDER FROM CV: at least one ",
+    "held-out Bayesian model failed sampling diagnostics."
+  )
   paired <- preds %>%
     select(
       sample_index,Site_ID,cv_group,Depth,fold,
@@ -640,6 +685,7 @@ if (cfg$run_prior_sensitivity) {
   )
   sensitivity <- list()
   sensitivity_diagnostics <- list()
+  sensitivity_correlations <- list()
   for (caseid in seq_along(cases)) {
     cas <- cases[[caseid]]
     x <- stan_data
@@ -695,8 +741,6 @@ if (cfg$run_prior_sensitivity) {
           method="spearman"
         )
       )
-      if (!exists("sensitivity_correlations"))
-        sensitivity_correlations <- list()
       sensitivity_correlations[[length(sensitivity_correlations)+1L]] <-
         pair_corr
       write_csv(
