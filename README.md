@@ -697,3 +697,58 @@ Set `comparison$run_only_fold=1L` to smoke-test one held-out fold; `comparison$r
 DO in mg/L; excess N₂ in original dataset units. On all 42 wells, the median absolute change in MAP-based LSR fraction was ~**0.004**, maximum ~**0.070**. The apparent advantage of including excess air is only **0.001–0.003 mg/L DO RMSE**, with no consistent extra-N₂ advantage. This is not a meaningful predictive advantage given much larger model residuals. Excluding site 16758 gives the same general result: DO RMSE shifts only a few thousandths and excess-N₂ RMSE differences stay around thousandths.
 
 **Interpretation:** It is reasonable to use **δ18O + Cl + Na** as a parsimonious conservative-tracer baseline *if* the full joint Stan ablation confirms similar held-out predictions, reasonable predictive coverage and acceptable sampler diagnostics. But Cl and Na are correlated and potentially reactive; with temporally variable δ18O, omitting excess air may reduce physically independent source information and broaden posterior fractions even when DO predictive scores barely change. Compare full posterior uncertainty rather than judging solely by predictive RMSE. Do not treat excess N₂ as a direct O₂ stoichiometric constraint: nitrate reduction generally begins after oxygen depletion, and its reactive signal also depends on nitrate supply, flow history and possible mixing.
+
+
+## Paired Bayesian prediction of DO and denitrification reaction progress (script 22)
+
+**Research question:** Given the lack of predictive improvement from paired DO/excess-N₂ models, can *fractional denitrification reaction progress* provide complementary information on the redox history and improve identifiability of groundwater DO loss?
+
+**Essential response definition (verified against the private prepared CSV):**
+
+```text
+reaction_progress = xs_N2 / (xs_N2 + NO3N + NO2)
+```
+
+All three quantities must use compatible **N-equivalent units**. The source CSV's `initial_NO3N` is *exactly* `xs_N2 + NO3N + NO2`; its `reaction_progress` was computed from the same underlying data. Neither should be a predictor or independent validation label for xs_N2, nitrate or reaction progress. This reconstructed index also assumes that xs_N2 is denitrification-derived and all relevant produced N₂ and remaining oxidised N have been accounted for; nitrate inputs, consumption by different processes and groundwater mixing can challenge those assumptions.
+
+**Sample selection:** Well `16758` is excluded by the study decision. Of the remaining 42 prepared groundwater records, **40 have DO, MRT and defined reaction progress**; one lacks MRT and another lacks NO2/progress. Two of the 40 reactions have progress exactly zero and one is extremely near one (none equals one). The proper likelihood must handle zeros and a bounded response without applying a plain Gaussian regression to raw fractions.
+
+**New files:**
+- `stan/22_joint_DO_denitrification_progress.stan` — joint two-source Bayesian source mixing, DO, and reaction-progress outcomes. The no-excess-air **three-tracer** baseline uses δ18O, Na, Cl (Na–Cl correlated observation model). A flag can add excess-air in a matched four-tracer sensitivity. LSR δ18O variability and uncertain true MRT remain modelled. DO boundary, apparent k and individual source fractions are inferred jointly.
+- `scripts/22_joint_DO_denitrification_progress.R` — four models and grouped five-fold validation, with BOTH DO and reaction progress masked at the same held-out wells. Full-data posteriors include k, LSR-entry DO, LSR DO deficit and well-averaged modelled components. Progress is a **separate reactive outcome**, not a mixing tracer. Uses exactly 40 complete response records by current dataset version.
+
+Progress observation likelihood: separate **Bernoulli hurdle** for exact zero, and for positive progress a robust **Student-t(df=4)** likelihood on logit(progress). An observation-specific logit uncertainty is approximated from the provided xs_N2 measurement uncertainty, with a separately inferred extra scatter term. Nitrate/nitrite analytical uncertainty is not supplied and cannot be propagated properly. The folded predictive SDs for HELD-OUT progress are based only on training data (not the held-out xs_N2), to prevent outcome leakage. `reaction_progress` itself is never an explanatory variable.
+
+Four alternatives:
+1. `DO_only` — four-tracer/three-tracer DO reference, progress not fitted; do not score its prior-only progress simulation.
+2. `progress_age` — progress from source fraction and log(1+MRT), no causal link to DO.
+3. `progress_DOloss` — additional positive statistical dependence on apparent cumulative DO loss.
+4. `progress_lowDO` — additional positive statistical dependence on the modelled residence duration below a fixed DO threshold (default 2 mg/L).
+
+This is not a stoichiometric DO-consuming denitrification model. Denitrification uses nitrate as the terminal electron acceptor and generally develops after depletion of DO, although anoxic microenvironments and distinct flow components can coexist with oxic groundwater. A high calculated progress can reflect **a small denominator (remaining nitrate)** rather than a high denitrification flux or low measured DO.
+
+**Run in Positron**, after privately copying the original prepared dataset to `data/Uwe_HP_data_prepared.csv`:
+
+```r
+source("scripts/22_joint_DO_denitrification_progress.R")
+```
+
+The default does **four full posterior fits and twenty grouped-CV fits**, with four chains each. To inspect the full posteriors only set `cfg$run_CV=FALSE`; for a single CV fold use `cfg$run_only_fold=1L`. `cfg$include_excess_air=TRUE` tests the extra mixing tracer without changing reactive response definitions; `cfg$low_DO_threshold=1` or `3` checks low-DO exposure assumptions. All original research data, per-well forecasts, posterior draws, plots and CSVs remain local and gitignored.
+
+### Independent preliminary paired screening (not Bayesian inference)
+
+A private regularized nonlinear least-squares screening fit used **fixed no-air or with-air tracer-only mixing fractions**, held out DO and progress together in five deterministic well-group folds, and scored on the same 40 wells (outlier excluded). It is NOT the fully joint Stan model, and it did **not** propagate posterior mixing, age and progress uncertainty:
+
+| Mixing | Response formulation | DO RMSE (mg/L) | Progress RMSE (fraction 0–1) |
+|---|---|---:|---:|
+| No excess air | DO-only | 1.775 | — |
+| No excess air | source + age progress | **1.774** | **0.261** |
+| No excess air | + modelled DO depletion | 1.779 | 0.261 |
+| No excess air | + low-DO exposure | 1.777 | 0.266 |
+| With excess air | source + age progress | 1.777 | 0.256 |
+| With excess air | + modelled DO depletion | 1.782 | **0.255** |
+| With excess air | + low-DO exposure | 1.778 | 0.261 |
+
+The coupled versions do NOT materially improve DO or progress prediction. For the **no-air 40-well dataset**, Spearman correlations of measured progress are **DO r_s≈−0.003**, **reported MRT r_s≈−0.122**, **tracer-only fLSR r_s≈−0.686**, **NO3N r_s≈−0.832**. The very strong negative association with remaining nitrate is particularly important because nitrate occurs **in the denominator of progress**. This does NOT imply the groundwater underwent proportionally more denitrification where nitrate was initially low; it may simply reflect the fractional definition and differences in recharge nitrate supply.
+
+**Validation status:** Code added and structural syntax checks performed. This environment lacks R/CmdStan, so the joint Stan model has **not** been compiled or executed. Bayesian posterior interval and grouped-CV scores must be obtained in Positron. Only consider a DO-process improvement if fully joint fits have acceptable Rhat/ESS/divergences and improve held-out outcomes without substantially relying on the inferred progress response denominator.
