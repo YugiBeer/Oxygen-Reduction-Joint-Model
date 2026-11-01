@@ -50,6 +50,10 @@ source("scripts/23_final_DO_two_pathway_kinetics.R")
 
 Current **safe first-run defaults**: 4 chains, 1400 warmup and 1400 post-warmup draws per chain, **2 Stan fits only** (one full zero-order and one full first-order model; `run_CV=FALSE`, `run_prior_sensitivity=FALSE`). Inspect their diagnostics first. For **matched grouped CV**, set `run_CV=TRUE` (2 full fits + 10 CV refits, or set `run_only_fold=1L` as a 4-fit smoke test). For the **full final audit**, also set `run_prior_sensitivity=TRUE` and `run_only_fold=NULL` (30 fits total: 2 full, 10 grouped CV, 18 sensitivity); this can take hours. Each full fit is saved as an RDS (unless `save_fits=FALSE`).
 
+## Source-tracer sodium ablation (diagnostic only)
+
+When posterior sampling remains poor, run `scripts/23a_sodium_ablation_diagnostics.R` to compare the same zero- and first-order aquifer model with and without sodium in the mixing likelihood. It masks `has_Na` (and zeros `Na` input) rather than changing the Stan model or the other data. Both cases retain only δ18O and Cl by default besides Na in the included version; excess air is off. All DO boundary conditions, priors, MRT treatment, sample selection and sampling settings are matched. The matched experiment runs four full fits with separate outputs `outputs/sodium_ablation_23a_*.csv` and `*.rds`; it does not overwrite the final-model result tables. Sodium-specific priors remain in the Stan model, so Na endmembers, residual scatter and correlation are *prior only* when Na is disabled, and are explicitly flagged and excluded from the aggregate active-parameter convergence summary. First inspect E-BFMI, R-hat, ESS and divergences for both versions. Improved convergence is evidence about sampler geometry, not about which source-tracer model is scientifically correct.
+
 ## Mandatory outputs and decision checks
 
 | Local output | Question addressed |

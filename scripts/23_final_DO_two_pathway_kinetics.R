@@ -56,6 +56,7 @@ cfg <- list(
   log_mrt_SD=.25,              # assume reported MRT mostly aquifer age
   vadose_years_assumptions=c(.25,1,5),
   include_excess_air=FALSE,    # previous held-out tests show little gain
+  include_sodium=TRUE,        # source chemistry; use 23a for a matched Na ablation
   folds=5L,
   seed=20261031L,
   chains=4L,
@@ -205,18 +206,21 @@ stan_data <- list(
   mrt_index=mrt_index,
   has_O18=as.integer(is.finite(d$O18)),
   has_Cl=as.integer(is.finite(d$Cl)),
-  has_Na=as.integer(is.finite(d$Na)),
+  has_Na=if (cfg$include_sodium)
+    as.integer(is.finite(d$Na)) else rep.int(0L,nrow(d)),
   has_air=if (cfg$include_excess_air)
     as.integer(is.finite(d$xs_Air)) else rep(0L,nrow(d)),
   has_DO=rep(1L,nrow(d)),
   O18=as_obs(d$O18),
   Cl=as_obs(d$Cl),
-  Na=as_obs(d$Na),
+  Na=if (cfg$include_sodium)
+    as_obs(d$Na) else rep(0,nrow(d)),
   air=if (cfg$include_excess_air)
     as_obs(d$xs_Air) else rep(0,nrow(d)),
   DO_obs=as.numeric(d$DO),
   Cl_sd=pmax(1,.03*as_obs(d$Cl)),
-  Na_sd=pmax(.5,.03*as_obs(d$Na)),
+  Na_sd=if (cfg$include_sodium)
+    pmax(.5,.03*as_obs(d$Na)) else rep(.5,nrow(d)),
   air_sd=as_sigma(d$xs_Air_uncertainty,.15),
   mrt_reported=as.numeric(d$MRT),
   aq_order=0L,
@@ -232,6 +236,11 @@ stan_data <- list(
 stan_data$has_DO[proxy_index] <- 0L
 stan_data$DO_obs[proxy_index] <- cfg$set_2801_model_DO
 eligible <- which(stan_data$has_DO==1L)
+message(
+  "SODIUM TRACER ",if(cfg$include_sodium) "included" else "excluded",
+  "; measured Na observations used: ",sum(stan_data$has_Na),
+  ". Standalone matched diagnostic: scripts/23a_sodium_ablation_diagnostics.R"
+)
 message(
   "After removing ",cfg$excluded_site,": ",
   nrow(d)," wells with DO+MRT and chemistry; ",

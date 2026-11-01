@@ -9,7 +9,8 @@ Earlier experiments and exploratory scripts **01–22** are retained, unchanged,
 | File | Role |
 |---|---|
 | [`scripts/00_check_setup.R`](scripts/00_check_setup.R) | Check local private input, required columns, packages and CmdStan before fitting |
-| [`scripts/23_final_DO_two_pathway_kinetics.R`](scripts/23_final_DO_two_pathway_kinetics.R) | **Only active model runner**: zero- and first-order aquifer kinetics |
+| [`scripts/23_final_DO_two_pathway_kinetics.R`](scripts/23_final_DO_two_pathway_kinetics.R) | **Primary model runner**: zero- and first-order aquifer kinetics |
+| [`scripts/23a_sodium_ablation_diagnostics.R`](scripts/23a_sodium_ablation_diagnostics.R) | Optional matched **with/without sodium** full-fit convergence diagnostic (four Stan fits) |
 | [`stan/23_final_DO_two_pathway_kinetics.stan`](stan/23_final_DO_two_pathway_kinetics.stan) | Stan model used by the runner |
 | [`docs/final_DO_model_protocol.md`](docs/final_DO_model_protocol.md) | Scientific assumptions, diagnostics, uncertainty and interpretation |
 | [`archive/README.md`](archive/README.md) | Guide to earlier studies and recovering archived scripts |
@@ -45,6 +46,22 @@ This fits **one zero-order and one first-order model**, using four chains for ea
 - `outputs/final_DO_23_identifiability_summary.csv` and `plots/final_DO_23_identifiability.png` — trade-off between LSR loss and aquifer rate
 
 **Do not infer the better reaction order from two in-sample fits.** Check diagnostics first.
+
+### Optional current diagnostic — sodium inclusion versus omission
+
+Previous full fits had severe R-hat / ESS and E-BFMI problems, most evident in Na–Cl residual and source-fraction parameters, even after non-centred MRT reparameterisation. **Before cross-validation, run a controlled sodium-ablation diagnostic**:
+
+```r
+source("scripts/23a_sodium_ablation_diagnostics.R")
+```
+
+This makes **four separate full fits**: zero and first order, each with Na included or completely masked. It uses the unchanged Stan model, all the same wells/DO responses, MRT prior, boundaries, priors and sampler settings. Excess air is off in both, so **without Na the retained mixing tracers are δ18O and Cl only**. No reactive nitrogen is fitted.
+
+Read `outputs/sodium_ablation_23a_comparison.csv` for worst active-parameter R-hat, minimum bulk ESS, divergences, treedepth and per-chain E-BFMI; `..._core.csv` and `..._chains.csv` for key posterior parameters and per-chain medians. Full per-parameter diagnostics and four RDS fits are also saved under `outputs/sodium_ablation_23a_*`. These results **do not overwrite** primary `final_DO_23_*` outputs.
+
+**Important qualification:** Sodium-specific nuisance parameters `Na_R`, `Na_LSR`, `sigma_Na`, and `rho_Na_Cl` remain in Stan but are sampled from their priors only when Na observations are masked. They are labelled in the diagnostics and excluded from the ablation's *active-parameter* convergence aggregate, but their per-parameter diagnostics are still saved. The excess-air nuisance parameters are likewise prior-only in both variants. A convergence improvement would isolate the contribution of the sodium likelihood to posterior geometry; it **would not establish** that sodium is chemically unsuitable or validate source mixing. Interpret no kinetic estimates from fits that fail sampler diagnostics.
+
+Script 23 also now exposes `include_sodium=TRUE` as a switch for later controlled work, but manually turning it off would reuse its standard output filenames; **prefer 23a for matched comparison**.
 
 ### Stage B — held-out prediction (12 fits total when run)
 
