@@ -57,6 +57,14 @@ This preserves the reported MRT as the arithmetic mean of the age prior. The sol
 
 Private input: `data/Uwe_HP_data_prepared.csv`. Required columns: `Site_ID`, `Depth`, `DO`, `MRT`, `O18` and `Cl`. Site 16758 is excluded. Site 2801's original DO measurement is not changed in the CSV; in-memory value 7.5 mg/L is not a fitted or scored DO observation. With the currently prepared file, 41 wells remain after exclusion and basic DO/MRT filtering, 40 of which contribute DO likelihood observations.
 
+## Execution and separation of responsibilities
+
+`source("scripts/00_setup.R")` performs preparation **only**: loads required packages, sets all configuration values (`cfg`), checks the private input and CmdStan installation, filters the sites, computes oxygen boundary conditions, prepares the reported-MRT non-centred indexing and builds `stan_data`. It does **not** compile Stan, call `$sample()`, produce fit reports, or source the fitting script. This makes it safe to inspect `d`, `cfg`, `Csat`, `proxy_index` and `stan_data` before fitting.
+
+`source("scripts/01_DO_dual_pathway_kinetics.R")` always runs setup again, then compiles/loads the existing `stan/01_DO_dual_pathway_kinetics.stan`, fits both kinetic orders and performs the same diagnostic and posterior-output steps as before. The Stan likelihood and all physical assumptions are unchanged by this refactor. To adjust `run_CV`, priors, boundary conditions or MCMC iterations, edit `cfg` in `scripts/00_setup.R`, **not** in script 01. Outputs are written only by script 01.
+
+The untracked local `scripts/0_setup.R` (one zero) reported by Positron previously contained MCMC calls and is not part of the active workflow. It must not be confused with the new `scripts/00_setup.R` (two zeros).
+
 ## Diagnostics and outputs
 
 The primary R runner saves:

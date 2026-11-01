@@ -18,4 +18,4 @@ data/*.feather
 stan/*.exe
 stan/*.o
 stan/*.hpp
-stan/23_final_DO_two_pathway_kinetics
+stan/01_DO_dual_pathway_kinetics

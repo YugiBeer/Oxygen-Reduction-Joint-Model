@@ -19,7 +19,9 @@ This directory retains **original, unchanged code snapshots** for reproducibilit
 | 23a | Matched with/without sodium convergence experiment establishing why the simplified script 01 was selected |
 | 00_check_setup | Former preflight for script 01; archived because script 01 validates its own environment and data |
 
-Corresponding Stan files (12, 15, 18, 19, 20, 22, 23) are stored under `archive/stan/`. Files `23_final_DO_two_pathway_kinetics.R`, `23a_sodium_ablation_diagnostics.R` and `00_check_setup.R` were moved **unchanged** from `scripts/` to `archive/scripts/`.
+Corresponding Stan files (12, 15, 18, 19, 20, 22, 23) are stored under `archive/stan/`.
+
+The former experimental protocol `docs/final_DO_model_protocol.md` is preserved unchanged at [`archive/docs/final_DO_model_protocol.md`](docs/final_DO_model_protocol.md). The active protocol is [`docs/01_DO_dual_pathway_kinetics.md`](../docs/01_DO_dual_pathway_kinetics.md). Files `23_final_DO_two_pathway_kinetics.R`, `23a_sodium_ablation_diagnostics.R` and `00_check_setup.R` were moved **unchanged** from `scripts/` to `archive/scripts/`.
 
 **Important:** Archiving moved these scripts without rewriting their internal relative paths or dependencies. They are **historical snapshots, not directly runnable at their archived paths**. To reproduce a historical experiment, copy the relevant `archive/scripts/*.R` and `archive/stan/*.stan` back to the original `scripts/` and `stan/` paths in a separate working branch or clone, then follow `README_legacy.md`. Some archived scripts source other archived scripts. Do not mix archived model outputs, sample definitions or rate assumptions with script 01 without a deliberate comparison.
 
