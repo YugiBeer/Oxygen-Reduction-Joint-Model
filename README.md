@@ -10,13 +10,12 @@ We model two recharge endmembers—**river recharge** and **land-surface recharg
 
 | Path | Purpose |
 |---|---|
-| [`scripts/00_check_setup.R`](scripts/00_check_setup.R) | Verify project root, private input, R packages and CmdStan |
 | [`scripts/01_DO_dual_pathway_kinetics.R`](scripts/01_DO_dual_pathway_kinetics.R) | **Primary R runner**: zero and first order, diagnostics, outputs, optional grouped CV |
 | [`stan/01_DO_dual_pathway_kinetics.stan`](stan/01_DO_dual_pathway_kinetics.stan) | **Primary Stan model**: δ¹⁸O/Cl mixing and dual recharge-pathway DO kinetics |
 | [`docs/01_DO_dual_pathway_kinetics.md`](docs/01_DO_dual_pathway_kinetics.md) | Scientific protocol, assumptions, outputs, limitations |
 | [`data/README.md`](data/README.md) | Private data requirements |
 
-Former model `scripts/23_final_DO_two_pathway_kinetics.R`, `stan/23_final_DO_two_pathway_kinetics.stan` and `scripts/23a_sodium_ablation_diagnostics.R` remain as **historical experiments**. Scripts 01–22 from an earlier experimental series are in [`archive/`](archive/README.md).
+Earlier models `23` and `23a`, their corresponding Stan code and the former `00_check_setup.R` preflight are preserved unchanged in [`archive/`](archive/README.md), alongside older experiments. **Only script 01 and its matching Stan file are active.** Script 01 includes its own environment and data checks.
 
 ### Run from Positron
 
@@ -26,7 +25,6 @@ Former model `scripts/23_final_DO_two_pathway_kinetics.R`, `stan/23_final_DO_two
 4. Run:
 
 ```r
-source("scripts/00_check_setup.R")
 source("scripts/01_DO_dual_pathway_kinetics.R")
 ```
 
