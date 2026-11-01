@@ -1,5 +1,9 @@
-# Local, private data
+# Local private data
 
-Place the source research file `Uwe_HP_data_prepared.csv` in this folder on your computer before running `scripts/00_check_setup.R` and `scripts/23_final_DO_two_pathway_kinetics.R`.
+Copy the unchanged original prepared research file to:
 
-The file must contain `Site_ID`, `Depth`, `DO`, `MRT`, `O18`, `Cl`, `Na`, `xs_Air`, and `xs_Air_uncertainty`. It is **not** committed to this public repository. Keep the original measurements unchanged; script 23 masks proxy site 2801 DO and excludes site 16758 in memory.
+`data/Uwe_HP_data_prepared.csv`
+
+The **primary two-endmember DO model** (`scripts/01_DO_dual_pathway_kinetics.R`) requires `Site_ID`, `Depth`, `DO`, `MRT`, `O18` and `Cl`. The CSV may contain other measured analytes, but **sodium and excess air are not used** in the new Stan model.
+
+Site **16758** is excluded as a far-south outlier. River-proximal site **2801** has a fixed, model-only DO value of 7.5 mg/L and its DO is masked from the likelihood; its original measured DO is not altered. Input data remain local and must never be committed to this repository.

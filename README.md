@@ -1,93 +1,57 @@
-# Heretaunga groundwater oxygen reduction — current workflow
+# Heretaunga groundwater oxygen reduction — two-endmember DO model
 
-**Start here.** This repository now has one active primary analysis: the final Bayesian comparison of **zero-order versus first-order aquifer oxygen reduction**, with an uncertain land-surface recharge (LSR) oxygen deficit.
+## Primary analysis: `01_DO_dual_pathway_kinetics`
 
-Earlier experiments and exploratory scripts **01–22** are retained, unchanged, under [`archive/`](archive/README.md). You **do not** have to run scripts 01–22 before script 23. The full historical README is retained at [`archive/README_legacy.md`](archive/README_legacy.md).
+We model two recharge endmembers—**river recharge** and **land-surface recharge (LSR)**—using only **δ¹⁸O and chloride** to constrain their mixing. Dissolved oxygen (DO) is reactive: each recharge pathway loses oxygen during aquifer residence, and the resulting concentrations are then mixed. The two competing aquifer models are **zero-order** and **first-order** kinetics, fitted independently with uncertainty.
 
-## Active files
+**Sodium and excess air are excluded**, following diagnostic experiments. The model contains no sodium or excess-air parameters. The former model and ablation experiment are preserved for reproducibility, not used in the primary analysis.
 
-| File | Role |
+### Active files
+
+| Path | Purpose |
 |---|---|
-| [`scripts/00_check_setup.R`](scripts/00_check_setup.R) | Check local private input, required columns, packages and CmdStan before fitting |
-| [`scripts/23_final_DO_two_pathway_kinetics.R`](scripts/23_final_DO_two_pathway_kinetics.R) | **Primary model runner**: zero- and first-order aquifer kinetics |
-| [`scripts/23a_sodium_ablation_diagnostics.R`](scripts/23a_sodium_ablation_diagnostics.R) | Optional matched **with/without sodium** full-fit convergence diagnostic (four Stan fits) |
-| [`stan/23_final_DO_two_pathway_kinetics.stan`](stan/23_final_DO_two_pathway_kinetics.stan) | Stan model used by the runner |
-| [`docs/final_DO_model_protocol.md`](docs/final_DO_model_protocol.md) | Scientific assumptions, diagnostics, uncertainty and interpretation |
-| [`archive/README.md`](archive/README.md) | Guide to earlier studies and recovering archived scripts |
+| [`scripts/00_check_setup.R`](scripts/00_check_setup.R) | Verify project root, private input, R packages and CmdStan |
+| [`scripts/01_DO_dual_pathway_kinetics.R`](scripts/01_DO_dual_pathway_kinetics.R) | **Primary R runner**: zero and first order, diagnostics, outputs, optional grouped CV |
+| [`stan/01_DO_dual_pathway_kinetics.stan`](stan/01_DO_dual_pathway_kinetics.stan) | **Primary Stan model**: δ¹⁸O/Cl mixing and dual recharge-pathway DO kinetics |
+| [`docs/01_DO_dual_pathway_kinetics.md`](docs/01_DO_dual_pathway_kinetics.md) | Scientific protocol, assumptions, outputs, limitations |
+| [`data/README.md`](data/README.md) | Private data requirements |
 
-## Run on your computer (Positron)
+Former model `scripts/23_final_DO_two_pathway_kinetics.R`, `stan/23_final_DO_two_pathway_kinetics.stan` and `scripts/23a_sodium_ablation_diagnostics.R` remain as **historical experiments**. Scripts 01–22 from an earlier experimental series are in [`archive/`](archive/README.md).
 
-1. Open the **Oxygen-Reduction-Joint-Model** repository folder as the Positron project / working directory. Check `getwd()`: `scripts/23_final_DO_two_pathway_kinetics.R` and `stan/23_final_DO_two_pathway_kinetics.stan` must be visible relative to it.
-2. Place the original **private** `Uwe_HP_data_prepared.csv` in `data/Uwe_HP_data_prepared.csv`. It contains sodium; the older reduced `groundwater.csv` is **not** the correct input. Research data remain local and must **never** be committed.
-3. Have R, `tidyverse`, `posterior`, `cmdstanr` and **CmdStan** installed. If needed, see [CmdStanR installation](https://mc-stan.org/cmdstanr/articles/cmdstanr.html).
-4. In the R console, run:
+### Run from Positron
+
+1. Open the **Oxygen-Reduction-Joint-Model** repository folder as the working directory.
+2. Copy the unchanged private source `Uwe_HP_data_prepared.csv` into `data/`; it must not be committed.
+3. Ensure R packages `tidyverse`, `posterior`, `cmdstanr` and CmdStan are installed.
+4. Run:
 
 ```r
 source("scripts/00_check_setup.R")
-source("scripts/23_final_DO_two_pathway_kinetics.R")
+source("scripts/01_DO_dual_pathway_kinetics.R")
 ```
 
-Run those commands **from the R console**, not by inserting a `source()` of the runner inside the runner itself.
+The initial run fits **two full models only** (four chains per model). The model-runner saves each fitted posterior immediately before producing reports. Results appear in:
 
-### Stage A — first run (default; 2 Stan fits)
-
-The runner now defaults to:
-
-```r
-run_CV=FALSE,
-run_prior_sensitivity=FALSE,
+```text
+outputs/01_DO_dual_pathway_kinetics/
+plots/01_DO_dual_pathway_kinetics/
 ```
 
-This fits **one zero-order and one first-order model**, using four chains for each. It does not depend on results from any prior scripts. Inspect:
+First inspect `fit_status.csv` and `sampler_chains.csv`. Then examine `global_posteriors.csv`, `well_posteriors.csv`, `identifiability.csv` and the joint-posterior plot. Do **not** interpret model parameters if full-fit diagnostics fail.
 
-- `outputs/final_DO_23_boundary_conditions.csv` — fixed rainfall and river entry boundary conditions
-- `outputs/final_DO_23_global_posteriors.csv` — posterior rates (with **different units** for each reaction order) and LSR DO deficit
-- `outputs/final_DO_23_fit_status.csv` and `outputs/final_DO_23_full_diagnostics.csv` — convergence and sampler health
-- `outputs/final_DO_23_identifiability_summary.csv` and `plots/final_DO_23_identifiability.png` — trade-off between LSR loss and aquifer rate
+**Grouped held-out DO comparison:** After both full fits converge, set `run_CV = TRUE` in the top-level `cfg` list of `scripts/01_DO_dual_pathway_kinetics.R`. It runs five matched grouped folds for both kinetic orders (10 extra fits), saves CV diagnostics and predictions, and performs a matched group bootstrap only if all folds converge. Source-tracer observations are retained for the held-out wells; their DO observations are masked.
 
-**Do not infer the better reaction order from two in-sample fits.** Check diagnostics first.
+### Fixed scientific assumptions
 
-### Optional current diagnostic — sodium inclusion versus omission
+- Rainfall starts at approximate atmospheric DO saturation at **15 °C** and an assumed atmospheric pressure ratio of 1.
+- River-to-aquifer entry DO is **fixed at 7.5 mg/L**.
+- River-proximal proxy **2801** is assigned 7.5 mg/L in memory only and its DO is **excluded** from likelihood and held-out scoring. Original private data are unchanged.
+- Far-south anomalous well **16758** is excluded.
+- LSR enters the water table with an inferred DO concentration between 0 and rainfall saturation. The result is an **LSR oxygen deficit**, not an identifiable LSR kinetic rate without independent vadose travel time.
+- Positive measured MRTs receive non-centred, mean-preserving lognormal uncertainty; proxy 2801 has MRT=0. The model assumes MRT effectively represents aquifer residence time for both recharge sources.
+- Zero-order rates are reported in **mg/L/year**; first-order rates in **year⁻¹**. These are alternative aquifer models, not simultaneous reactions.
+- Arithmetic averages over wells are **not** flow-weighted catchment oxygen budgets.
 
-Previous full fits had severe R-hat / ESS and E-BFMI problems, most evident in Na–Cl residual and source-fraction parameters, even after non-centred MRT reparameterisation. **Before cross-validation, run a controlled sodium-ablation diagnostic**:
+A converged sampler demonstrates computational reliability, **not** structural identifiability or validation of the endmembers. Check grouped predictive performance and sensitivity to endmembers, MRT and boundaries before physical interpretation or publication.
 
-```r
-source("scripts/23a_sodium_ablation_diagnostics.R")
-```
-
-This makes **four separate full fits**: zero and first order, each with Na included or completely masked. It uses the unchanged Stan model, all the same wells/DO responses, MRT prior, boundaries, priors and sampler settings. Excess air is off in both, so **without Na the retained mixing tracers are δ18O and Cl only**. No reactive nitrogen is fitted.
-
-Read `outputs/sodium_ablation_23a_comparison.csv` for worst active-parameter R-hat, minimum bulk ESS, divergences, treedepth and per-chain E-BFMI; `..._core.csv` and `..._chains.csv` for key posterior parameters and per-chain medians. Full per-parameter diagnostics and four RDS fits are also saved under `outputs/sodium_ablation_23a_*`. These results **do not overwrite** primary `final_DO_23_*` outputs.
-
-**Important qualification:** Sodium-specific nuisance parameters `Na_R`, `Na_LSR`, `sigma_Na`, and `rho_Na_Cl` remain in Stan but are sampled from their priors only when Na observations are masked. They are labelled in the diagnostics and excluded from the ablation's *active-parameter* convergence aggregate, but their per-parameter diagnostics are still saved. The excess-air nuisance parameters are likewise prior-only in both variants. A convergence improvement would isolate the contribution of the sodium likelihood to posterior geometry; it **would not establish** that sodium is chemically unsuitable or validate source mixing. Interpret no kinetic estimates from fits that fail sampler diagnostics.
-
-Script 23 also now exposes `include_sodium=TRUE` as a switch for later controlled work, but manually turning it off would reuse its standard output filenames; **prefer 23a for matched comparison**.
-
-### Stage B — held-out prediction (12 fits total when run)
-
-Once Stage A runs acceptably, change `cfg` at the top of `scripts/23_final_DO_two_pathway_kinetics.R`:
-
-```r
-run_CV=TRUE,
-run_prior_sensitivity=FALSE,
-```
-
-Re-running fits both full models **again**, plus the **10 grouped-CV refits**. Examine `outputs/final_DO_23_cv_scores.csv`, `outputs/final_DO_23_cv_fit_status.csv` and `outputs/final_DO_23_cv_bootstrap_summary.csv`. To test only one fold first, set `run_only_fold=1L`, but do **not** use single-fold scores to rank kinetic orders.
-
-### Stage C — boundary/prior sensitivities (30 fits total)
-
-For a full final audit, set `run_CV=TRUE`, `run_only_fold=NULL` and `run_prior_sensitivity=TRUE`. This runs 2 full models, 10 CV fits and 18 sensitivity fits. Sensitivities include recharge temperature, fixed river DO, MRT uncertainty, LSR survival prior, mixing-endmember prior width and excess air. Check `outputs/final_DO_23_sensitivity_*.csv` before interpreting physical rates.
-
-**The script was statically reviewed but has not yet been executed under R/CmdStan in this editing environment.** Your local full-fit and CV diagnostics determine whether any posterior is suitable for scientific interpretation.
-
-## Fixed boundary conditions and essential caveats
-
-The primary river-to-aquifer DO boundary is **fixed at 7.5 mg/L**. The river-proximal proxy well **2801** receives 7.5 mg/L only in the *model data*, and its DO response is **masked from both fitting and CV**. The original private observation is never overwritten. Outlier **16758** is excluded. Rainfall starts at assumed atmospheric DO saturation (default 15 °C, approximate pressure ratio 1); DO at the LSR water table is inferred.
-
-The model estimates a *surface-to-water-table LSR DO deficit*, **not independently identifiable unsaturated-zone reaction rates**. Conditional LSR rates in the output depend on assumed vadose travel times. The aquifer rate depends on the reported MRT representing aquifer residence and on the tracer mixing formulation. Chloride/mixing sensitivity from script 12 remains a warning against claiming that LSR loss is precisely determined; script 23's correlated Na–Cl observation model does **not** by itself resolve all source-fraction uncertainty. See [the scientific protocol](docs/final_DO_model_protocol.md).
-
-## Keeping a clean local copy
-
-For an existing local clone, first check `git status` and preserve any local edits. Then run `git pull --ff-only` from the repository directory. This will move previously tracked scripts into `archive/`, but it will not remove ignored local data and outputs. If the pull cannot fast-forward because of local edits, resolve or stash those edits **before** pulling; do not force-reset unless you deliberately want to discard local changes.
-
-All `data/*.csv`, `outputs/`, and `plots/` are ignored by Git. The archive is version-controlled and recoverable.
+**Code verification:** The new files were statically checked and aligned with the previously converged no-sodium/no-air model. Compilation and MCMC execution must be verified in the local R/CmdStan environment.
