@@ -46,7 +46,7 @@ From the repository root, with CmdStanR, CmdStan, posterior and tidyverse instal
 source("scripts/23_final_DO_two_pathway_kinetics.R")
 ```
 
-Current defaults: 4 chains, 1400 warmup and 1400 post-warmup draws per chain; **30 Stan fits**: 2 full models, 2×5 grouped held-out folds, and 2×9 prior/boundary sensitivity fits. This could take hours. Use Positron on a suitable machine. To smoke-test, edit settings at the top of the runner to set `run_prior_sensitivity=FALSE` and `run_only_fold=1L` before executing (4 fits). For full posteriors only, set both `run_CV=FALSE` and `run_prior_sensitivity=FALSE` (2 fits). Restore both switches before final reporting. Each full fit is saved as an RDS (unless `save_fits=FALSE`).
+Current **safe first-run defaults**: 4 chains, 1400 warmup and 1400 post-warmup draws per chain, **2 Stan fits only** (one full zero-order and one full first-order model; `run_CV=FALSE`, `run_prior_sensitivity=FALSE`). Inspect their diagnostics first. For **matched grouped CV**, set `run_CV=TRUE` (2 full fits + 10 CV refits, or set `run_only_fold=1L` as a 4-fit smoke test). For the **full final audit**, also set `run_prior_sensitivity=TRUE` and `run_only_fold=NULL` (30 fits total: 2 full, 10 grouped CV, 18 sensitivity); this can take hours. Each full fit is saved as an RDS (unless `save_fits=FALSE`).
 
 ## Mandatory outputs and decision checks
 

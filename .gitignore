@@ -5,7 +5,17 @@ Rplots.pdf
 .~lock.*#
 outputs/
 plots/
-data/groundwater.csv
 
-# Original private research dataset for four-tracer model
-data/Uwe_HP_data_prepared.csv
+# All research measurements and intermediate private datasets stay local.
+data/*.csv
+data/*.rds
+data/*.xlsx
+data/*.xls
+data/*.parquet
+data/*.feather
+
+# CmdStan compilation products
+stan/*.exe
+stan/*.o
+stan/*.hpp
+stan/23_final_DO_two_pathway_kinetics

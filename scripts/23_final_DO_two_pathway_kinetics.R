@@ -66,9 +66,9 @@ cfg <- list(
   max_treedepth=13L,
   max_rhat=1.05,
   min_bulk_ESS=400,
-  run_CV=TRUE,                # 2 full and 10 paired grouped CV fits
+  run_CV=FALSE,               # FIRST RUN: 2 full fits only; enable later for 10 grouped-CV fits
   run_only_fold=NULL,        # 1L for smoke test, else NULL
-  run_prior_sensitivity=TRUE,  # full fits for selected BC/priors
+  run_prior_sensitivity=FALSE, # FIRST RUN: enable later for 18 BC/prior sensitivity fits
   save_fits=TRUE
 )
 
