@@ -231,9 +231,9 @@ posterior95 <- function(fit,vars) {
     select(variable,mean,median,sd,rhat,ess_bulk,ess_tail) %>%
     mutate(
       lower95=vapply(variable,function(v)
-        unname(quantile(mat[,v],.025)),numeric(1)),
+        unname(quantile(as.numeric(mat[,v]),.025)),numeric(1)),
       upper95=vapply(variable,function(v)
-        unname(quantile(mat[,v],.975)),numeric(1))
+        unname(quantile(as.numeric(mat[,v]),.975)),numeric(1))
     )
 }
 names_global <- c(
@@ -299,6 +299,9 @@ for (order in 0:1) {
   # Save fitted chains before any downstream summary / CSV generation.
   if (cfg$save_fits) fit$save_object(file=paste0(
     "outputs/final_DO_23_full_order",order,".rds"
+  ))
+  write_csv(as_tibble(fit$diagnostic_summary()), paste0(
+    "outputs/final_DO_23_sampler_diagnostics_order",order,".csv"
   ))
   post[[order+1L]] <- posterior95(fit,names_global) %>%
     mutate(
@@ -378,8 +381,8 @@ for (order in 0:1) {
                 "LSR_first_order_exposure")
   ))
   rates <- map_dfr(cfg$vadose_years_assumptions,function(t) {
-    k0 <- sub[,"LSR_zero_order_exposure"]/t
-    k1 <- sub[,"LSR_first_order_exposure"]/t
+    k0 <- as.numeric(sub[,"LSR_zero_order_exposure"])/t
+    k1 <- as.numeric(sub[,"LSR_first_order_exposure"])/t
     bind_rows(
       tibble(
         assumed_vadose_years=t,
@@ -502,9 +505,9 @@ if (cfg$run_CV) {
         fit$draws(variables=c(v,pr))
       )
       predmean <- vapply(v,function(z)
-        mean(draws[,z]),numeric(1))
+        mean(as.numeric(draws[,z])),numeric(1))
       qvar <- function(names,p) vapply(names,function(z)
-        unname(quantile(draws[,z],p)),numeric(1))
+        unname(quantile(as.numeric(draws[,z]),p)),numeric(1))
       pp <- tibble(
         aquifer_order=order,
         fold=fold,
