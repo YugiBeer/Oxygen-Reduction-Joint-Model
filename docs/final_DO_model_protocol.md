@@ -14,7 +14,7 @@ Estimate (a) oxygen depletion between rainfall saturation and the water table fo
 | LSR at water table | Unknown \(C_{\mathrm{LSR,WT}} = C_{\mathrm{sat}} s\), \(0<s<1\) | Infer \(s\) jointly from tracer mixing, age and DO; default \(s \sim \mathrm{Beta}(1,1)\). |
 | River recharge at aquifer entry | **Exactly 7.5 mg/L for primary model** | User-chosen defensible boundary; explore fixed 6.5 and 8.5 mg/L ONLY as separately labelled sensitivities. |
 | River-dominated study well 2801 | **Model-only DO assigned 7.5 mg/L** | Original measured DO (10.2 mg/L) is retained unmodified in the private source CSV. Model-only assigned DO is **masked out of the fitting likelihood** and excluded from CV, avoiding circular pseudo-evidence. Its tracer data remain. |
-| Aquifer age | Reported MRT is an uncertain proxy for aquifer residence time | Lognormal mean-centred prior, log SD 0.25 baseline, 0.5 sensitivity. No separate LSR-specific MRT inferred. |
+| Aquifer age | Reported MRT is an uncertain proxy for aquifer residence time | **Non-centred** mean-centred lognormal prior for positive reported MRT, log SD 0.25 baseline, 0.5 sensitivity. The sole zero-MRT record (river-proxy 2801) has fixed age zero and its DO is masked. No separate LSR-specific MRT inferred. |
 
 The original private `data/Uwe_HP_data_prepared.csv` contains 43 records. Exclude the far-south outlier **16758**: 42 remain. Of these, 41 have recorded DO and MRT, and 40 *independent DO responses* remain after masking 2801. No source observation is overwritten in the original CSV.
 
@@ -33,6 +33,8 @@ The source concentrations \(C(0)\) are \(7.5\) mg/L for river recharge and \(C_{
 
 Both models share the weakly informative half-normal prior on fractional depletion at \(C_\mathrm{ref}=7.5\) mg/L, sampled as \(k_\mathrm{ref}\ge0\):
 \(k_0=7.5\,k_\mathrm{ref}\) versus \(k_1=k_\mathrm{ref}\), with \(k_\mathrm{ref}\sim\mathrm{Normal}^+(0,0.15)\) yr⁻¹. This is a comparable reference-relative prior, not proof of equal model complexity or mechanism.
+
+**Sampling change (2 November 2026):** For wells with reported MRT > 0, the Stan model now samples a standard-normal age perturbation \(z_i\) and transforms it to \(t_i=\exp[\log(\mathrm{MRT}_i)-\tfrac12\sigma_{\log t}^2+\sigma_{\log t}z_i]\). This non-centred representation preserves the previously assumed, mean-centred lognormal marginal distribution of true MRT. The only zero-MRT sample, 2801, now has fixed age 0 rather than a weak half-normal latent age; because its DO is withheld, this does not change the fitted DO likelihood. This is a sampler-geometry experiment, **not** a solution to the LSR-versus-aquifer identifiability problem. Earlier zero/first-order fits failed convergence diagnostics (including low E-BFMI and first-order divergences); rerun both full models and check R-hat, bulk ESS, divergences and E-BFMI before proceeding to CV. No change was made to the source mixing, DO entry boundaries or reaction-coefficient priors.
 
 **Primary identifiable LSR quantity:** \(\Delta C_{\mathrm{LSR}}=C_{\mathrm{sat}}-C_{\mathrm{LSR,WT}}\) mg/L, including full posterior uncertainty. The data do **not** identify separate unsaturated-zone zero- versus first-order rate constants absent vadose travel-time information. *Conditional* rates for assumed 0.25, 1 and 5-year residence times are only derived transformations of the same inferred DO deficit and must be labelled as such.
 

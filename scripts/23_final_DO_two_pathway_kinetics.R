@@ -179,14 +179,30 @@ message(
   " mg/L, model-only assigned value=",cfg$set_2801_model_DO,
   " mg/L (DO observation masked)."
 )
+message(
+  "Non-centred MRT: positive ages retain mean-centred lognormal prior; ",
+  "zero-reported-MRT samples use fixed age 0."
+)
 d$DO[proxy_index] <- cfg$set_2801_model_DO
 
 as_obs <- function(x) ifelse(is.finite(x),as.numeric(x),0)
 as_sigma <- function(x,default) ifelse(
   is.finite(x)&x>0,as.numeric(x),default
 )
+# Compact age indices: zero-reported-MRT rows (2801) use fixed age zero.
+# For positive MRTs, Stan retains the exact prior mean and log-SD.
+positive_mrt <- d$MRT > 0
+mrt_index <- as.integer(ifelse(positive_mrt, cumsum(positive_mrt), 0L))
+stopifnot(
+  length(mrt_index)==nrow(d),
+  identical(sort(unique(mrt_index[mrt_index>0])),
+            seq_len(sum(positive_mrt))),
+  all(mrt_index[!positive_mrt]==0L)
+)
 stan_data <- list(
   N=nrow(d),
+  N_mrt_positive=as.integer(sum(positive_mrt)),
+  mrt_index=mrt_index,
   has_O18=as.integer(is.finite(d$O18)),
   has_Cl=as.integer(is.finite(d$Cl)),
   has_Na=as.integer(is.finite(d$Na)),

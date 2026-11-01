@@ -34,6 +34,9 @@
 //
 // WARNING: reported groundwater MRT is the SAME effective aquifer
 // residence time for both recharge sources; no source-specific ages.
+// Positive MRT uncertainty uses a non-centred standard-normal latent.
+// The only reported zero-MRT observation (proxy well 2801) has fixed age
+// zero; its DO is excluded from the likelihood by the matching R runner.
 // If MRT includes vadose travel, this partition is not identifiable.
 // Csat is assumed. The river DO is a FIXED 7.5-mg/L boundary
 // supplied by R, not an inferred parameter or a second measurement
@@ -54,6 +57,10 @@ data {
   vector<lower=0>[N] Na_sd;
   vector<lower=0>[N] air_sd;
   vector<lower=0>[N] mrt_reported;
+  // Map positive reported MRTs to a compact vector of standard-normal latents.
+  // A zero MRT (2801 in the current input) has no latent age parameter.
+  int<lower=0,upper=N> N_mrt_positive;
+  array[N] int<lower=0,upper=N_mrt_positive> mrt_index;
   int<lower=0,upper=1> aq_order;
   real<lower=0> Csat_rain;
   real<lower=0> C_ref;
@@ -73,7 +80,7 @@ parameters {
   real<lower=0,upper=1.5> air_R;
   real<lower=1.5,upper=9> air_LSR;
   vector<lower=0,upper=1>[N] f_LSR;
-  vector<lower=0>[N] true_MRT;
+  vector[N_mrt_positive] z_mrt; // non-centred age uncertainty
   real<lower=0> sigma_O18;
   real<lower=0> tau_LSR_O18;
   real<lower=0> sigma_Cl;
@@ -85,6 +92,10 @@ parameters {
   real<lower=0> sigma_DO;
 }
 transformed parameters {
+  // For positive MRT, EXACTLY the previous mean-centred lognormal prior:
+  // E[true_MRT | reported] = mrt_reported, log SD = log_mrt_SD.
+  // Non-centering changes posterior geometry, not this assumed age prior.
+  vector[N] true_MRT;
   real river_DO = river_DO_boundary; // fixed; for output/reporting
   real LSR_DO_at_water_table = Csat_rain*survival_LSR;
   vector[N] mean_DO;
@@ -92,6 +103,17 @@ transformed parameters {
   vector[N] vadose_LSR_DO_loss;
   vector[N] river_DO_after_aquifer;
   vector[N] LSR_DO_after_aquifer;
+  for (i in 1:N) {
+    if (mrt_index[i] == 0) {
+      // 2801: reported zero-age river proxy; DO excluded from likelihood.
+      true_MRT[i] = 0;
+    } else {
+      true_MRT[i] = exp(
+        log(mrt_reported[i]) - 0.5*square(log_mrt_SD) +
+        log_mrt_SD*z_mrt[mrt_index[i]]
+      );
+    }
+  }
   for (i in 1:N) {
     real t = true_MRT[i];
     real river_at_well;
@@ -127,6 +149,7 @@ model {
   air_R ~ normal(.1221,.35*endmember_prior_scale);
   air_LSR ~ normal(4.0434,1.4*endmember_prior_scale);
   f_LSR ~ beta(1,1);
+  z_mrt ~ std_normal();
   sigma_O18 ~ normal(0,.30);
   tau_LSR_O18 ~ normal(0,.80);
   sigma_Cl ~ normal(0,10);
@@ -150,15 +173,6 @@ model {
     real sdCl = sqrt(square(Cl_sd[i])+square(sigma_Cl));
     real sdNa = sqrt(square(Na_sd[i])+square(sigma_Na));
     real sdAir = sqrt(square(air_sd[i])+square(sigma_air));
-
-    // Reported MRT is the mean of an assumed lognormal age prior.
-    // Zero-MRT special case is a nonnegative near-zero-age prior.
-    if (mrt_reported[i]>0)
-      true_MRT[i] ~ lognormal(
-        log(mrt_reported[i])-.5*square(log_mrt_SD),
-        log_mrt_SD
-      );
-    else true_MRT[i] ~ normal(0,.5);
 
     if (has_O18[i]==1)
       O18[i] ~ normal(muO18,sdO18);
