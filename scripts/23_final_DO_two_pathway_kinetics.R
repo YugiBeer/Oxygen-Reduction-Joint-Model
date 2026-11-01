@@ -296,6 +296,10 @@ for (order in 0:1) {
   message("FULL JOINT FIT aquifer reaction ORDER ",order,
           if (order==0) " (zero-order)" else " (first-order)")
   fit <- sample_model(order)
+  # Save fitted chains before any downstream summary / CSV generation.
+  if (cfg$save_fits) fit$save_object(file=paste0(
+    "outputs/final_DO_23_full_order",order,".rds"
+  ))
   post[[order+1L]] <- posterior95(fit,names_global) %>%
     mutate(
       aquifer_order=order,
@@ -313,11 +317,11 @@ for (order in 0:1) {
     "LSR_DO_deficit","aquifer_rate_actual","survival_LSR",
     "mean_vadose_LSR_DO_loss","mean_aquifer_DO_loss"
   )))
-  loss <- latent[,"LSR_DO_deficit"]
-  rate <- latent[,"aquifer_rate_actual"]
-  sv <- latent[,"survival_LSR"]
-  vadose_loss <- latent[,"mean_vadose_LSR_DO_loss"]
-  aq_loss <- latent[,"mean_aquifer_DO_loss"]
+  loss <- as.numeric(latent[,"LSR_DO_deficit"])
+  rate <- as.numeric(latent[,"aquifer_rate_actual"])
+  sv <- as.numeric(latent[,"survival_LSR"])
+  vadose_loss <- as.numeric(latent[,"mean_vadose_LSR_DO_loss"])
+  aq_loss <- as.numeric(latent[,"mean_aquifer_DO_loss"])
   # Beta(a,b) prior SD of the assumed LSR survival fraction.
   a <- cfg$survival_prior_a
   b <- cfg$survival_prior_b
@@ -326,9 +330,9 @@ for (order in 0:1) {
     aquifer_order=order,
     kinetic_rate_units=if(order==0) "mg/L/year" else "year^-1",
     n_posterior_draws=length(loss),
-    pearson_deficit_rate=cor(loss,rate),
-    spearman_deficit_rate=cor(loss,rate,method="spearman"),
-    pearson_vadose_aquifer_loss=cor(vadose_loss,aq_loss),
+    pearson_deficit_rate=as.numeric(cor(loss,rate)),
+    spearman_deficit_rate=as.numeric(cor(loss,rate,method="spearman")),
+    pearson_vadose_aquifer_loss=as.numeric(cor(vadose_loss,aq_loss)),
     posterior_LSR_deficit_sd=sd(loss),
     prior_LSR_deficit_sd=prior_sd,
     posterior_to_prior_LSR_sd=sd(loss)/prior_sd,
@@ -400,9 +404,6 @@ for (order in 0:1) {
     ) %>%
     mutate(aquifer_order=order,.before=1)
   conditional[[order+1L]] <- rates
-  if (cfg$save_fits) fit$save_object(file=paste0(
-    "outputs/final_DO_23_full_order",order,".rds"
-  ))
   write_csv(bind_rows(post),"outputs/final_DO_23_global_posteriors.csv")
   write_csv(bind_rows(diag),"outputs/final_DO_23_full_diagnostics.csv")
   write_csv(bind_rows(wells),"outputs/final_DO_23_well_posteriors.csv")
@@ -731,15 +732,15 @@ if (cfg$run_prior_sensitivity) {
       ))
       pair_corr <- tibble(
         scenario=cas$name,order=order,
-        pearson_deficit_rate=cor(
-          z[,"LSR_DO_deficit"],
-          z[,"aquifer_rate_actual"]
-        ),
-        spearman_deficit_rate=cor(
-          z[,"LSR_DO_deficit"],
-          z[,"aquifer_rate_actual"],
+        pearson_deficit_rate=as.numeric(cor(
+          as.numeric(z[,"LSR_DO_deficit"]),
+          as.numeric(z[,"aquifer_rate_actual"])
+        )),
+        spearman_deficit_rate=as.numeric(cor(
+          as.numeric(z[,"LSR_DO_deficit"]),
+          as.numeric(z[,"aquifer_rate_actual"]),
           method="spearman"
-        )
+        ))
       )
       sensitivity_correlations[[length(sensitivity_correlations)+1L]] <-
         pair_corr
