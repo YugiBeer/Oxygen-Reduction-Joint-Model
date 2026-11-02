@@ -505,7 +505,10 @@ if (file.exists(cv_path)) {
 # 09–10: Optional river DO prior sensitivity. Only displayed if the
 # experiment 04 has been run. These preserve the blue river / red rainfall
 # endmember semantics of the main Turbo-colour plots. No refitting.
-for (proxy_suite in c("2801_included","2801_masked")) {
+for (proxy_suite in c(
+  "2801_masked_no2130", "2801_included_no2130",
+  "2801_included", "2801_masked"
+)) {
   sensitivity_path <- file.path(
     "outputs","04_river_DO_prior",proxy_suite,"comparison_summary.csv"
   )

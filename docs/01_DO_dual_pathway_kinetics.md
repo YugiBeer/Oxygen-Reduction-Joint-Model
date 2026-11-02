@@ -165,3 +165,32 @@ Outputs are automatically isolated in `outputs/05_river_DO_grouped_CV/2801_maske
 Script `02_DO_plotting.R` recognizes both paths, with and without 2130, automatically. With the default excluded-site configuration it labels plots accordingly and makes no claim to predict 2130. All fit/scoring diagnostics and grouped uncertainty comparisons remain separate across these two designs.
 
 **Scientific rationale:** 2130 is a shallow water-race-adjacent observation in the far west that may not represent regional aquifer groundwater. This is a hydrogeological *representativeness exclusion*, not an attempt to manipulate fit residuals. The original 40-well model and its CV are retained for sensitivity reporting.
+
+
+### Regional model posterior refits after excluding well 2130 (script 04)
+
+**Primary 39-DO-site model:** Download/replace `scripts/04_river_DO_prior_sensitivity.R` from the latest repository version. At the top of script 04:
+
+```r
+include_proxy_DO=FALSE, # masks 2801's DO (10.2 mg/L)
+exclude_DO_sites="2130", # masks 2130's DO
+scenarios=tibble::tibble(
+  scenario=c("A_fixed_7p5","C_prior_sd1p5"),
+  infer_river_DO=c(0L,1L),
+  river_DO_prior_sd=c(0,1.5)
+),
+```
+
+
+There is **no** `include_2801_DO` setting in script 04; that setting belongs to script 05. The two excluded DO values are zeroed in Stan data and their likelihood indicators are off. **Both wells' δ¹⁸O and chloride data remain in the mixing model; neither is dropped from the private source CSV.** Their original observed DO is preserved in `d$DO_original` and reported as a diagnostic only.
+
+This version runs four full-data posterior fits (fixed vs broad river prior, each with zero- and first-order kinetics). The earlier intermediate SD=1 prior may be restored for sensitivity, but adds two fits and previously required extra MCMC attention. Outputs are written to **`outputs/04_river_DO_prior/2801_masked_no2130/`**, leaving prior `2801_included/` and `2801_masked/` posterior fits untouched. Compare `comparison_summary.csv` and `fit_status.csv`. The primary selected specification is `A_fixed_7p5` with `aquifer_order=1`; the other three fits provide kinetic/boundary sensitivities.
+
+Run:
+
+```r
+source("scripts/04_river_DO_prior_sensitivity.R")
+```
+
+
+The updated plotting-only script `scripts/02_DO_plotting.R` can additionally read this new `2801_masked_no2130/` directory, producing the river-boundary and parameter-comparison figures without refitting the models.

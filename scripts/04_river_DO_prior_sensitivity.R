@@ -4,21 +4,21 @@
 # informative uncertain boundaries. Uses the two-endmember O18 + chloride
 # mixing model and competing zero-/first-order aquifer DO kinetics.
 #
-# THREE scenarios * TWO kinetic orders = SIX independent Stan fits.
-#   A fixed:      river DO = 7.5 mg/L
-#   B prior_sd1:  river DO ~ Normal(7.5, 1.0^2) truncated [0,14.65]
-#   C prior_sd1p5:river DO ~ Normal(7.5, 1.5^2) truncated [0,14.65]
+# DEFAULT: two scenarios * two kinetic orders = four independent Stan fits.
+#   A fixed:      river DO = 7.5 mg/L — preferred regional primary model
+#   C prior_sd1p5:river DO ~ Normal(7.5,1.5^2) truncated [0,14.65]
+# Optional B prior_sd1 can be restored in cfg04$scenarios if needed.
 #
-# Critical: original observed DO in well 2801 is 10.2 mg/L (not 10.5).
-# Setup 00 NEVER overwrites it. In THIS matched sensitivity experiment,
-# 2801 DO is INCLUDED as ONE ordinary groundwater observation in ALL SIX
-# fits. Its O18 / Cl data still inform the source mixture; it is NOT a
-# direct measurement of river entry DO or a hard river boundary.
+# Site 2801: measured groundwater DO=10.2 mg/L, MRT assumed zero.
+# PRIMARY excludes its DO from fitting, but keeps O18 and chloride.
+# Site 2130: shallow well next to water race; PRIMARY excludes its DO
+# from fitting, but retains O18 and chloride in the mixing model.
+# Neither site is removed from the groundwater input CSV, and no values
+# are replaced in 00_setup.R. The observation mask alone changes.
 #
-# To test influence of this river-proximal observation, change
-# include_proxy_DO to FALSE: all three scenarios will mask 2801 instead,
-# and results are written to a different output directory. Do not mix
-# the include and exclude suites when interpreting prior effects.
+# Results from this 39-DO-site regional fit go into a distinct output
+# folder ("2801_masked_no2130"). Earlier 40- and 41-well results stay
+# untouched, even when the experiment is rerun.
 #
 # Keeps primary 01 outputs, primary Stan file and 02 plots untouched.
 # Data file remains local and unchanged. Samples saved before diagnostics.
@@ -31,11 +31,12 @@ source("scripts/00_setup.R",local=TRUE)
 
 cfg04 <- list(
   stan="stan/04_river_DO_prior_sensitivity.stan",
-  include_proxy_DO=TRUE,
+  include_proxy_DO=FALSE, # Site 2801: exclude DO; retain O18 and Cl
+  exclude_DO_sites="2130", # Exclude DO; retain O18 and Cl
   scenarios=tibble::tibble(
-    scenario=c("A_fixed_7p5","B_prior_sd1","C_prior_sd1p5"),
-    infer_river_DO=c(0L,1L,1L),
-    river_DO_prior_sd=c(0,1,1.5)
+    scenario=c("A_fixed_7p5","C_prior_sd1p5"),
+    infer_river_DO=c(0L,1L),
+    river_DO_prior_sd=c(0,1.5)
   ),
   chains=cfg$chains,
   parallel_chains=cfg$parallel_chains,
@@ -65,10 +66,23 @@ if (!is.finite(d$DO_original[proxy_index]))
   stop("2801 measured DO is missing; cannot run matched inclusion test.")
 if (anyDuplicated(d$Site_ID[d$Site_ID==cfg$river_proxy_site]))
   stop("Duplicated 2801 proxy.")
-if (!"2130" %in% d$Site_ID)
-  stop("High-DO well 2130 missing from current prepared data.")
+# Explicit DO-only exclusion. The tracer records are not dropped.
+exclude_DO_sites <- unique(as.character(cfg04$exclude_DO_sites))
+if (anyNA(exclude_DO_sites) ||
+    any(!grepl("^[A-Za-z0-9_]+$",exclude_DO_sites)))
+  stop("exclude_DO_sites must contain valid Site_ID strings.")
+if (any(!exclude_DO_sites %in% d$Site_ID))
+  stop("Unknown excluded DO site(s): ",
+       paste(setdiff(exclude_DO_sites,d$Site_ID),collapse=", "))
+if (cfg$river_proxy_site %in% exclude_DO_sites)
+  stop("2801 already has a separate DO inclusion control.")
+excluded_ix <- which(d$Site_ID %in% exclude_DO_sites)
+if (!("2130" %in% d$Site_ID))
+  stop("Site 2130 missing from current prepared data.")
 
 suite <- if (cfg04$include_proxy_DO) "2801_included" else "2801_masked"
+if (length(exclude_DO_sites))
+  suite <- paste0(suite,"_no",paste(sort(exclude_DO_sites),collapse="_"))
 out04 <- file.path("outputs","04_river_DO_prior",suite)
 dir.create(out04,recursive=TRUE,showWarnings=FALSE)
 file04 <- function(name) file.path(out04,name)
@@ -78,6 +92,9 @@ file04 <- function(name) file.path(out04,name)
 xbase <- stan_data
 xbase$has_DO[proxy_index] <- as.integer(cfg04$include_proxy_DO)
 xbase$DO_obs <- as.numeric(d$DO_original)
+# Make sure excluded DO cannot enter the Stan likelihood even indirectly.
+xbase$has_DO[excluded_ix] <- 0L
+xbase$DO_obs[excluded_ix] <- 0
 if (cfg04$include_proxy_DO &&
     (xbase$has_DO[proxy_index]!=1L ||
      xbase$DO_obs[proxy_index]!=d$DO_original[proxy_index]))
@@ -86,7 +103,12 @@ if (!cfg04$include_proxy_DO && xbase$has_DO[proxy_index]!=0L)
   stop("Failed to mask 2801 DO.")
 stopifnot(
   xbase$N==nrow(d),
-  sum(xbase$has_DO)==nrow(d)-as.integer(!cfg04$include_proxy_DO)
+  sum(xbase$has_DO)==nrow(d)-as.integer(!cfg04$include_proxy_DO)-
+    length(excluded_ix),
+  all(xbase$has_DO[excluded_ix]==0L),
+  all(xbase$DO_obs[excluded_ix]==0),
+  identical(xbase$has_O18,stan_data$has_O18),
+  identical(xbase$has_Cl,stan_data$has_Cl)
 )
 
 audit <- cfg04$scenarios %>%
@@ -95,6 +117,8 @@ audit <- cfg04$scenarios %>%
     observed_2130_DO=d$DO_original[match("2130",d$Site_ID)],
     river_entry_prior_mean=cfg$river_DO_boundary,
     proxy_DO_used=cfg04$include_proxy_DO,
+    excluded_DO_sites=paste(exclude_DO_sites,collapse=";"),
+    excluded_DO_n=length(excluded_ix),
     n_independent_DO=sum(xbase$has_DO),
     rainfall_surface_DO=Csat,
     log_mrt_SD=cfg$log_mrt_SD,
@@ -104,7 +128,13 @@ readr::write_csv(audit,file04("scenario_design.csv"))
 message("River DO prior sensitivity: ",suite,
         " | 2801 actual DO=",d$DO_original[proxy_index],
         " mg/L | DO likelihood wells=",sum(xbase$has_DO))
-message("Fit 3 scenarios * 2 aquifer orders, identical observation masks.")
+if (length(exclude_DO_sites)) {
+  message("Excluded from DO likelihood: ",
+          paste(exclude_DO_sites,collapse=", "),
+          " (O18 and Cl preserved).")
+}
+message("Fit ",nrow(cfg04$scenarios),
+        " scenarios * 2 aquifer orders, identical observation masks.")
 
 # Check all active population parameters and per-well latents.
 active <- c(
@@ -173,8 +203,14 @@ for (sc_i in seq_len(nrow(cfg04$scenarios))) {
     x$aq_order <- as.integer(order)
     x$infer_river_DO <- as.integer(sc$infer_river_DO)
     x$river_DO_prior_sd <- as.numeric(sc$river_DO_prior_sd)
+    excluded_label <- if (length(exclude_DO_sites)) {
+      paste(exclude_DO_sites,collapse=", ")
+    } else {
+      "none"
+    }
     message("\nFIT ",sc$scenario," | aquifer order=",order,
-            " | 2801 DO ",if (cfg04$include_proxy_DO) "included" else "masked")
+            " | 2801 DO ",if (cfg04$include_proxy_DO) "included" else "masked",
+            " | DO excluded: ",excluded_label)
     fit <- mod04$sample(
       data=x,
       seed=as.integer(cfg04$seed+201L*sc_i+10009L*order),
@@ -215,8 +251,8 @@ for (sc_i in seq_len(nrow(cfg04$scenarios))) {
     readr::write_csv(dplyr::bind_rows(post),
                      file04("global_posteriors.csv"))
 
-    # Both target sites are included in these summaries, even if proxy
-    # 2801's DO is masked in the alternative sensitivity suite.
+    # The held-out target sites are predicted for diagnostic purposes.
+    # Neither site's DO enters the primary analysis likelihood.
     for (siteid in c(cfg$river_proxy_site,"2130")) {
       i <- match(siteid,d$Site_ID)
       v <- paste0(
@@ -252,22 +288,28 @@ for (sc_i in seq_len(nrow(cfg04$scenarios))) {
     )))
     correlations[[length(correlations)+1L]] <- tibble::tibble(
       scenario=sc$scenario,aquifer_order=order,
-      corr_riverDO_aquiferRate=if(sc$infer_river_DO==1L)
+      corr_riverDO_aquiferRate=if(sc$infer_river_DO==1L) {
         cor(as.numeric(lat[,"river_DO"]),
             as.numeric(lat[,"aquifer_rate_actual"]))
-        else NA_real_,
-      corr_riverDO_LSRdeficit=if(sc$infer_river_DO==1L)
+      } else {
+        NA_real_
+      },
+      corr_riverDO_LSRdeficit=if(sc$infer_river_DO==1L) {
         cor(as.numeric(lat[,"river_DO"]),
             as.numeric(lat[,"LSR_DO_deficit"]))
-        else NA_real_,
+      } else {
+        NA_real_
+      },
       corr_LSRdeficit_aquiferRate=cor(
         as.numeric(lat[,"LSR_DO_deficit"]),
         as.numeric(lat[,"aquifer_rate_actual"])
       ),
-      corr_riverDO_LSRfraction=if(sc$infer_river_DO==1L)
+      corr_riverDO_LSRfraction=if(sc$infer_river_DO==1L) {
         cor(as.numeric(lat[,"river_DO"]),
             as.numeric(lat[,"mean_f_LSR"]))
-        else NA_real_
+      } else {
+        NA_real_
+      }
     )
     readr::write_csv(dplyr::bind_rows(correlations),
                      file04("posterior_correlations.csv"))
@@ -285,7 +327,7 @@ summary <- long %>%
     median,lower95,upper95,rate_units
   )
 readr::write_csv(summary,file04("comparison_summary.csv"))
-message("\nSAMPLER QUALITY (all six fits):")
+message("\nSAMPLER QUALITY (all fitted models):")
 print(full,n=Inf,width=Inf)
 message("\nRIVER DO PRIOR SENSITIVITY: MEDIANS AND 95% INTERVALS")
 print(summary,n=Inf,width=Inf)
