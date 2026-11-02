@@ -220,7 +220,7 @@ density06 <- function(variable,title,xlab,filename) {
            x=xlab,y="Posterior density",
            caption="Baseline: equal-tail 95% credible interval and posterior median. No density is possible for a fixed parameter.")
   } else {
-    sm <- summary06 %>% filter(.data$variable==variable)
+    sm <- summary06 %>% filter(.data$variable==.env$variable)
     p <- ggplot(dat,aes(x=.data[[variable]],
                         colour=scenario,fill=scenario)) +
       geom_density(alpha=0.18,linewidth=0.8,adjust=1.0) +
@@ -278,10 +278,11 @@ cor06 <- post06 %>%
     r_LSRdeficit_aquiferRate=cor(
       LSR_DO_deficit,aquifer_rate_actual
     ),
-    r_riverDO_aquiferRate=if (isTRUE(dplyr::first(scenario)=="A_fixed_7p5"))
+    r_riverDO_aquiferRate=if (isTRUE(dplyr::first(scenario)=="A_fixed_7p5")) {
       NA_real_
-    else
-      cor(river_DO,aquifer_rate_actual),
+    } else {
+      cor(river_DO,aquifer_rate_actual)
+    },
     .groups="drop"
   )
 # Fixed river DO has zero variance; its correlation with rate is undefined.
