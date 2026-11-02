@@ -112,8 +112,12 @@ if (length(proxy_index)!=1L)
   stop("Missing or duplicated river proxy after filtering.")
 if (any(d$MRT==0 & d$Site_ID!=cfg$river_proxy_site))
   stop("Unexpected zero-MRT sample: review age assumptions before fitting.")
+# Preserve the ORIGINAL observed DO at every site, including proxy 2801.
+# Site 2801 has measured DO=10.2 mg/L in the current source dataset.
+# Never overwrite it with the river-entry boundary (7.5 mg/L).
+# Baseline model 01 masks 2801 in its DO likelihood; the sensitivity
+# model 04 can explicitly include its measured DO as a groundwater sample.
 d$DO_original <- d$DO
-d$DO[proxy_index] <- cfg$river_DO_boundary # model-only, NEVER written to CSV
 
 positive_mrt <- d$MRT>0
 mrt_index <- as.integer(ifelse(
@@ -132,7 +136,7 @@ stan_data <- list(
   has_DO=as.integer(seq_len(nrow(d))!=proxy_index),
   O18=as_obs(d$O18),
   Cl=as_obs(d$Cl),
-  DO_obs=as.numeric(d$DO),
+  DO_obs=as.numeric(d$DO_original),
   Cl_sd=pmax(1,0.03*as_obs(d$Cl)),
   mrt_reported=as.numeric(d$MRT),
   N_mrt_positive=as.integer(sum(positive_mrt)),
@@ -159,5 +163,6 @@ message("01 TWO-POT DO MODEL: ",nrow(d)," wells; ",
 message("Fixed river DO ",cfg$river_DO_boundary,
         " mg/L; rainfall saturation DO ",signif(Csat,4),
         " mg/L. 2801 original DO ",d$DO_original[proxy_index],
-        " mg/L not fitted. Sodium and excess air NOT modelled.")
+        " mg/L preserved unchanged; masked in baseline 01. ",
+        "Sodium and excess air NOT modelled.")
 

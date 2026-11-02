@@ -502,6 +502,118 @@ if (file.exists(cv_path)) {
   }
 }
 
+# 09–10: Optional river DO prior sensitivity. Only displayed if the
+# experiment 04 has been run. These preserve the blue river / red rainfall
+# endmember semantics of the main Turbo-colour plots. No refitting.
+for (proxy_suite in c("2801_included","2801_masked")) {
+  sensitivity_path <- file.path(
+    "outputs","04_river_DO_prior",proxy_suite,"comparison_summary.csv"
+  )
+  if (!file.exists(sensitivity_path)) next
+  sens <- readr::read_csv(
+    sensitivity_path,show_col_types=FALSE
+  ) %>%
+    mutate(
+      order_label=order_label(aquifer_order),
+      scenario=factor(
+        scenario,levels=c(
+          "A_fixed_7p5","B_prior_sd1","C_prior_sd1p5"
+        )
+      )
+    )
+  if (anyNA(sens$scenario)) {
+    warning("Unexpected scenario names in ",sensitivity_path,
+            "; skipping sensitivity plots.")
+    next
+  }
+  selected <- sens %>% filter(variable %in% c(
+    "river_DO","LSR_DO_at_water_table"
+  )) %>% mutate(
+    source=recode(
+      variable,
+      river_DO="River entry",
+      LSR_DO_at_water_table="Rainfall / LSR at WT"
+    )
+  )
+  if (nrow(selected)) {
+    ps <- ggplot(
+      selected,aes(
+        x=scenario,y=median,colour=source,
+        ymin=lower95,ymax=upper95
+      )
+    )+
+      geom_pointrange(
+        position=position_dodge(width=.4),
+        linewidth=.65
+      )+
+      facet_wrap(~order_label)+
+      scale_colour_manual(
+        values=c(
+          "River entry"=river_blue,
+          "Rainfall / LSR at WT"=rain_red
+        ),name="Recharge DO"
+      )+
+      labs(
+        title=paste("River DO boundary sensitivity —",proxy_suite),
+        subtitle="Posterior medians and central 95% credible intervals",
+        x="River boundary prior specification",
+        y="Oxygen concentration (mg/L)",
+        caption=paste(
+          "River point is a fitted GLOBAL boundary;",
+          "site 2801 is a groundwater observation,",
+          "not an independent river-water measurement."
+        )
+      )+base_theme()+
+      theme(axis.text.x=element_text(
+        angle=20,hjust=1
+      ))
+    save_plot(
+      ps,paste0("09_boundary_prior_",proxy_suite,".png"),
+      width=11,height=6
+    )
+  }
+
+  rate <- sens %>% filter(
+    variable %in% c("aquifer_rate_actual","LSR_DO_deficit")
+  ) %>% mutate(
+    quantity=recode(
+      variable,
+      aquifer_rate_actual="Aquifer rate (unit depends on order)",
+      LSR_DO_deficit="LSR DO deficit (mg/L)"
+    )
+  )
+  if (nrow(rate)) {
+    pr <- ggplot(
+      rate,aes(
+        x=scenario,y=median,
+        ymin=lower95,ymax=upper95,colour=quantity
+      )
+    )+
+      geom_pointrange(linewidth=.65)+
+      facet_grid(
+        quantity~order_label,
+        scales="free_y"
+      )+
+      scale_colour_manual(
+        values=c(
+          "Aquifer rate (unit depends on order)"=aquifer_green,
+          "LSR DO deficit (mg/L)"=rain_red
+        ),name=NULL
+      )+
+      labs(
+        title=paste("Aquifer rates and LSR deficit —",proxy_suite),
+        subtitle="Check parameter stability and identifiability as river DO prior widens",
+        x="River boundary prior specification",
+        y="Posterior median and central 95% interval"
+      )+base_theme()+
+      theme(axis.text.x=element_text(angle=20,hjust=1))
+    save_plot(
+      pr,paste0("10_kinetics_prior_",proxy_suite,".png"),
+      width=11,height=8
+    )
+  }
+}
+
 cat("\nPLOTS WRITTEN (no MCMC was run):\n")
 cat(paste0("  ",manifest,collapse="\n"),"\n",sep="")
 message("Plots should appear in Positron's Plots pane when sourced ",

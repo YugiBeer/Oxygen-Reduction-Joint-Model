@@ -14,11 +14,13 @@ We model two recharge endmembers—**river recharge** and **land-surface recharg
 | [`scripts/01_DO_dual_pathway_kinetics.R`](scripts/01_DO_dual_pathway_kinetics.R) | **Primary R runner**: zero and first order, diagnostics, outputs, optional grouped CV; sources setup automatically |
 | [`scripts/02_DO_plotting.R`](scripts/02_DO_plotting.R) | **Plot-only**: publication-style figures from existing saved posterior CSVs; no refitting |
 | [`scripts/03_high_DO_audit.R`](scripts/03_high_DO_audit.R) | **High-DO audit**: observed saturation, physical bounds, posterior comparison for 2130; no MCMC |
+| [`scripts/04_river_DO_prior_sensitivity.R`](scripts/04_river_DO_prior_sensitivity.R) | **Controlled experiment**: 3 river-entry DO priors × 2 kinetic orders; unchanged 2801 observations |
+| [`stan/04_river_DO_prior_sensitivity.stan`](stan/04_river_DO_prior_sensitivity.stan) | River DO as fixed or one shared uncertain boundary (no extra parameter in fixed scenario) |
 | [`stan/01_DO_dual_pathway_kinetics.stan`](stan/01_DO_dual_pathway_kinetics.stan) | **Primary Stan model**: δ¹⁸O/Cl mixing and dual recharge-pathway DO kinetics |
 | [`docs/01_DO_dual_pathway_kinetics.md`](docs/01_DO_dual_pathway_kinetics.md) | Scientific protocol, assumptions, outputs, limitations |
 | [`data/README.md`](data/README.md) | Private data requirements |
 
-Earlier models `23` and `23a`, their corresponding Stan code and the former `00_check_setup.R` preflight are preserved unchanged in [`archive/`](archive/README.md), alongside older experiments. **Scripts 00 (setup), 01 (fitting), 02 (plotting) and 03 (high-DO audit), plus the matching Stan model, are active.** Setup is separate from sampling. The earlier `archive/scripts/00_check_setup.R` is a different, obsolete preflight.
+Earlier models `23` and `23a`, their corresponding Stan code and the former `00_check_setup.R` preflight are preserved unchanged in [`archive/`](archive/README.md), alongside older experiments. **Scripts 00 (setup), 01 (baseline fitting), 02 (plotting), 03 (high-DO audit), and 04 (river-entry prior sensitivity) are active.** Setup is separate from sampling. The earlier `archive/scripts/00_check_setup.R` is a different, obsolete preflight.
 
 ### Run from Positron
 
@@ -64,7 +66,7 @@ First inspect `fit_status.csv` and `sampler_chains.csv`. Then examine `global_po
 
 - Rainfall starts at approximate atmospheric DO saturation at **15 °C** and an assumed atmospheric pressure ratio of 1.
 - River-to-aquifer entry DO is **fixed at 7.5 mg/L**.
-- River-proximal proxy **2801** is assigned 7.5 mg/L in memory only and its DO is **excluded** from likelihood and held-out scoring. Original private data are unchanged.
+- River-proximal well **2801** retains its **measured DO of 10.2 mg/L** in setup and all data objects. Baseline 01 excludes its measured DO from the likelihood; experiment 04 includes it as one groundwater observation in all three prior scenarios. The **7.5 mg/L value is a river-entry assumption**, never a replacement of the 2801 measurement.
 - Far-south anomalous well **16758** is excluded.
 - LSR enters the water table with an inferred DO concentration between 0 and rainfall saturation. The result is an **LSR oxygen deficit**, not an identifiable LSR kinetic rate without independent vadose travel time.
 - Positive measured MRTs receive non-centred, mean-preserving lognormal uncertainty; proxy 2801 has MRT=0. The model assumes MRT effectively represents aquifer residence time for both recharge sources.
@@ -100,3 +102,25 @@ Outputs are saved in `outputs/01_DO_dual_pathway_kinetics/high_DO_*.csv` and, wh
 The plotting-only script creates seven standard PNG figures: observed vs fitted DO; δ¹⁸O–chloride two-endmember mixing; per-well LSR fractions; LSR DO deficit vs aquifer rate; LSR pre-water-table vs aquifer DO loss; source-pathway DO decay; and DO residuals versus MRT. An eighth plot of held-out DO predictions is generated if `cv_predictions.csv` exists.
 
 All data colours use **Turbo** from `viridisLite`; **river recharge is Turbo blue and rainfall/LSR is Turbo red**. The continuous LSR-fraction scale is explicitly limited to the Turbo blue–red range. Aquifer loss across both sources uses Turbo green so it cannot be confused with river recharge. Neutral grey is used only for reference lines. Graphs are printed explicitly and saved at 300 dpi. The well-wise intervals stored by script 01 are `q5`–`q95` (90% posterior credible), while `global_posteriors.csv` contains central 95% intervals. The fitted DO chart is in-sample; the optional CV chart alone represents held-out predictions.
+
+### River-entry DO prior sensitivity (experiment 04)
+
+**Do not overwrite the established results from model 01.** Experiment 04 creates separate outputs, and uses the same δ¹⁸O/Cl mixing and aquifer kinetics as 01. It fits six models (three river-entry priors × zero- and first-order aquifer kinetics):
+
+| Scenario | River-entry DO |
+|---|---|
+| `A_fixed_7p5` | Fixed 7.5 mg/L |
+| `B_prior_sd1` | Normal(7.5, 1.0²) mg/L, truncated to 0–14.65 mg/L |
+| `C_prior_sd1p5` | Normal(7.5, 1.5²) mg/L, truncated to 0–14.65 mg/L |
+
+**Site 2801 is observed at 10.2 mg/L, not 10.5 mg/L.** `00_setup.R` no longer substitutes 7.5 mg/L for its DO. The baseline 01 fit **masks** 2801 DO as before; in experiment 04, the default `include_proxy_DO=TRUE` includes the actual 2801 observation as ONE river-proximal groundwater sample for **all six scenario fits**, rather than fixing the river boundary to that value. No source file is modified. The reported zero-MRT age at 2801 remains fixed at zero, which is an additional assumption requiring sensitivity analysis. To repeat all six scenarios without using 2801 DO, change `cfg04$include_proxy_DO=FALSE`; this writes to a separate folder.
+
+Run after pulling the latest changes:
+
+```r
+source("scripts/04_river_DO_prior_sensitivity.R")
+```
+
+Results, individual fit objects, diagnostic reports and posterior correlations are written under `outputs/04_river_DO_prior/2801_included/` (or `2801_masked/`). Run `source("scripts/02_DO_plotting.R")` afterwards to generate the additional Turbo-colour boundary and rate sensitivity plots. **02 does not refit anything**.
+
+The fixed 04 scenario is directly comparable to the uncertain 04 scenarios because the observations are identical. **Do not attribute changes between the old baseline 01 and 04 solely to the river prior**—the inclusion of 2801 DO differs. Posterior predictive tail probabilities in 04 are in-sample checks, not grouped cross-validation. A global boundary DO can mask seasonality and spatial variation; convergence and posterior stability must be checked before adopting the prior in the primary model.
