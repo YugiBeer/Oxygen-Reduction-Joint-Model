@@ -16,6 +16,7 @@ We model two recharge endmembers—**river recharge** and **land-surface recharg
 | [`scripts/03_high_DO_audit.R`](scripts/03_high_DO_audit.R) | **High-DO audit**: observed saturation, physical bounds, posterior comparison for 2130; no MCMC |
 | [`scripts/04_river_DO_prior_sensitivity.R`](scripts/04_river_DO_prior_sensitivity.R) | **Controlled experiment**: 3 river-entry DO priors × 2 kinetic orders; unchanged 2801 observations |
 | [`stan/04_river_DO_prior_sensitivity.stan`](stan/04_river_DO_prior_sensitivity.stan) | River DO as fixed or one shared uncertain boundary (no extra parameter in fixed scenario) |
+| [`scripts/05_river_DO_grouped_CV.R`](scripts/05_river_DO_grouped_CV.R) | **Grouped held-out DO CV**: fixed versus broad river DO prior, both kinetic orders; 2801 masked by default |
 | [`stan/01_DO_dual_pathway_kinetics.stan`](stan/01_DO_dual_pathway_kinetics.stan) | **Primary Stan model**: δ¹⁸O/Cl mixing and dual recharge-pathway DO kinetics |
 | [`docs/01_DO_dual_pathway_kinetics.md`](docs/01_DO_dual_pathway_kinetics.md) | Scientific protocol, assumptions, outputs, limitations |
 | [`data/README.md`](data/README.md) | Private data requirements |
@@ -124,3 +125,45 @@ source("scripts/04_river_DO_prior_sensitivity.R")
 Results, individual fit objects, diagnostic reports and posterior correlations are written under `outputs/04_river_DO_prior/2801_included/` (or `2801_masked/`). Run `source("scripts/02_DO_plotting.R")` afterwards to generate the additional Turbo-colour boundary and rate sensitivity plots. **02 does not refit anything**.
 
 The fixed 04 scenario is directly comparable to the uncertain 04 scenarios because the observations are identical. **Do not attribute changes between the old baseline 01 and 04 solely to the river prior**—the inclusion of 2801 DO differs. Posterior predictive tail probabilities in 04 are in-sample checks, not grouped cross-validation. A global boundary DO can mask seasonality and spatial variation; convergence and posterior stability must be checked before adopting the prior in the primary model.
+
+
+### Grouped cross-validation of broad river DO prior (script 05)
+
+To test the candidate **river-entry DO ~ Normal(7.5, 1.5²) mg/L**, use:
+
+```r
+source("scripts/05_river_DO_grouped_CV.R")
+```
+
+
+This is a **standalone CV runner**. It will NOT rerun full-data fits 01 or 04. It runs five matched groups of held-out DO for four variants:
+
+| River boundary | Aquifer kinetics |
+|---|---|
+| Fixed 7.5 mg/L | Zero order |
+| Fixed 7.5 mg/L | First order |
+| Normal(7.5, 1.5²) truncated 0–14.65 mg/L | Zero order |
+| Normal(7.5, 1.5²) truncated 0–14.65 mg/L | First order |
+
+**Primary: 2801 excluded from the DO likelihood AND from scoring.** Its measured 10.2 mg/L is left intact in the data and its δ¹⁸O and Cl are retained for source mixing. All remaining **40 wells** receive one held-out DO prediction in each model. Site 2130 is **held out** when its fold is evaluated. All four variants use identical group folds and the same reported MRTs, endmember priors, DO observation model and aquifer-rate priors.
+
+The first run performs **20 CV MCMC fits** (four variants × five folds), saves each fit object immediately and writes per-fit predictions/diagnostics. If interrupted, re-run the same command: previously completed fit objects are reused. The script checks a saved design fingerprint (data, source scripts, Stan model, options, fold assignments) to reject incompatible cached fits. For an initial single-fold test, set `cfg05$run_only_fold=1L` inside script 05; set it back to `NULL` for the complete study. **Do not rank models using incomplete folds or failed MCMC diagnostics.**
+
+Outputs appear in `outputs/05_river_DO_grouped_CV/2801_masked/` including:
+
+- `cv_predictions.csv`: held-out mean DO, Student-t posterior predictive 95% limits, LSR fraction and MRT.
+- `cv_scores.csv`: RMSE, MAE, bias, predictive 95% coverage, fold counts and convergence flags.
+- `cv_fit_status.csv`: R-hat, bulk and tail ESS, E-BFMI, divergences, treedepth.
+- `cv_2130_predictions.csv`: genuinely held-out DO for site 2130.
+- `cv_group_bootstrap_summary.csv`: paired **cluster bootstrap** (by named well family) of predictive differences, produced only once all 20 fits pass diagnostics. Negative **C-minus-A** favours the broad prior; negative **first-minus-zero** favours first-order kinetics.
+
+**2801 inclusion sensitivity:** Set `cfg05$include_2801_DO=TRUE` in script 05 and rerun. This repeats the same 20 fits with 2801’s true DO **included in training only**, while always scoring the same 40 non-proxy wells. It writes to the distinct `outputs/05_river_DO_grouped_CV/2801_in_training/` folder. This separates the effect of including 2801 from that of changing the river prior.
+
+For additional **Turbo plots**, run:
+
+```r
+source("scripts/02_DO_plotting.R")
+```
+
+
+Script 02 automatically picks up available CV outputs and creates plots 11 (held-out observed/predicted DO, 95% predictive intervals, 2130 labelled) and 12 (per-well change in absolute error for broad prior minus fixed). **No MCMC occurs in script 02.**
