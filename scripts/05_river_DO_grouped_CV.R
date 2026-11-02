@@ -226,11 +226,13 @@ message("BROAD river prior = Normal(",cfg$river_DO_boundary,
 message("Site 2801 actual DO=",d$DO_original[proxy_index],
         " mg/L; use in TRAINING: ",cfg05$include_2801_DO,
         "; scored: NEVER.")
-if (length(exclude_DO_sites))
+if (length(exclude_DO_sites)) {
   message("DO excluded from ALL training/validation fits: ",
           paste(exclude_DO_sites,collapse=", "),
           " (tracer observations RETAINED).")
-else message("All non-proxy wells are eligible for held-out DO scoring.")
+} else {
+  message("All non-proxy wells are eligible for held-out DO scoring.")
+}
 
 # Diagnostics: check all sampled latent parameters, source chemistry,
 # global DO parameters and the key aggregate LSR loss quantity. The
@@ -321,9 +323,11 @@ for (fold in selected_folds) {
       # Permit a targeted retry with longer chains without changing
       # the base design or discarding the other 19 completed fits.
       # The previous failing RDS remains available as .previous_fail.rds.
-      old_status <- if (file.exists(statusfile))
+      old_status <- if (file.exists(statusfile)) {
         readr::read_csv(statusfile,show_col_types=FALSE)
-      else NULL
+      } else {
+        NULL
+      }
       retry_this <- cfg05$refit_failed &&
         file.exists(fitfile) &&
         !is.null(old_status) &&
@@ -336,15 +340,19 @@ for (fold in selected_folds) {
         message("REUSE CV FIT: ",tag)
         fit <- readRDS(fitfile)
         iter_used <- if (!is.null(old_status) &&
-                         "iter_sampling_used" %in% names(old_status))
+                         "iter_sampling_used" %in% names(old_status)) {
           as.integer(old_status$iter_sampling_used[[1]])
-        else cfg05$sampling
+        } else {
+          cfg05$sampling
+        }
       } else {
         if (retry_this && !cfg05$resume)
           stop("Selective retry requires resume=TRUE.")
-        iter_used <- if (retry_this)
+        iter_used <- if (retry_this) {
           cfg05$failed_sampling
-        else cfg05$sampling
+        } else {
+          cfg05$sampling
+        }
         message(
           if (retry_this) "RETRY FAILED CV FIT: " else "SAMPLE CV: ",
           tag," | held out ",length(held),
