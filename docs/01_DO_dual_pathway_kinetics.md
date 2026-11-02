@@ -65,6 +65,16 @@ Private input: `data/Uwe_HP_data_prepared.csv`. Required columns: `Site_ID`, `De
 
 The untracked local `scripts/0_setup.R` (one zero) reported by Positron previously contained MCMC calls and is not part of the active workflow. It must not be confused with the new `scripts/00_setup.R` (two zeros).
 
+## Plotting (script 02)
+
+Run `source("scripts/02_DO_plotting.R")` **after** script 01. The plotting workflow never compiles a Stan model or performs MCMC. It sources `00_setup.R` to reuse the original filtered dataset and model settings, then reads the `global_posteriors.csv`, `well_posteriors.csv`, `joint_draws.csv` and (if available) `cv_predictions.csv` written by script 01. It prints each ggplot explicitly and saves it as a 300-dpi PNG in `plots/01_DO_dual_pathway_kinetics/`; no posterior refitting is required.
+
+Plots 01–07 show observed versus fitted DO, δ¹⁸O–Cl endmember mixing, well LSR fractions, LSR–aquifer rate identifiability, per-well DO-loss partition, source-specific DO decay against MRT, and fitted DO residuals against MRT. Plot 08 adds held-out DO prediction if grouped CV outputs exist.
+
+**Turbo palette and semantics:** river recharge is Turbo blue (`turbo(256)[32]`), rainfall/LSR recharge is Turbo red (`turbo(256)[230]`), and the continuous mixing fraction runs between those blue and red colours. Aquifer loss from both source waters is green (`turbo(256)[128]`), not river blue. Grey is used for reference lines only. These colours apply consistently across all plots.
+
+**Uncertainty conventions:** `global_posteriors.csv` provides central **95%** posterior credible intervals. The saved per-well `fit$summary()` provides `q5` and `q95` (**90%** posterior credible intervals); these are correctly labelled as 90% in the plots. Fitted `mean_DO` credible intervals are **not predictive intervals**. Only the optional CV plot uses posterior predictive 95% intervals. The source-pathway decay curves use posterior median parameters and are illustrative, not posterior prediction bands.
+
 ## Diagnostics and outputs
 
 The primary R runner saves:

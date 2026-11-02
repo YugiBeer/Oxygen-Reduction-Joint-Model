@@ -12,17 +12,18 @@ We model two recharge endmembers—**river recharge** and **land-surface recharg
 |---|---|
 | [`scripts/00_setup.R`](scripts/00_setup.R) | **Setup only**: parameters, private data validation, filtered wells, O18/Cl observations and `stan_data`; no MCMC |
 | [`scripts/01_DO_dual_pathway_kinetics.R`](scripts/01_DO_dual_pathway_kinetics.R) | **Primary R runner**: zero and first order, diagnostics, outputs, optional grouped CV; sources setup automatically |
+| [`scripts/02_DO_plotting.R`](scripts/02_DO_plotting.R) | **Plot-only**: publication-style figures from existing saved posterior CSVs; no refitting |
 | [`stan/01_DO_dual_pathway_kinetics.stan`](stan/01_DO_dual_pathway_kinetics.stan) | **Primary Stan model**: δ¹⁸O/Cl mixing and dual recharge-pathway DO kinetics |
 | [`docs/01_DO_dual_pathway_kinetics.md`](docs/01_DO_dual_pathway_kinetics.md) | Scientific protocol, assumptions, outputs, limitations |
 | [`data/README.md`](data/README.md) | Private data requirements |
 
-Earlier models `23` and `23a`, their corresponding Stan code and the former `00_check_setup.R` preflight are preserved unchanged in [`archive/`](archive/README.md), alongside older experiments. **Only scripts 00 and 01 and the matching Stan file are active.** Setup is separate from sampling. The earlier `archive/scripts/00_check_setup.R` is a different, obsolete preflight.
+Earlier models `23` and `23a`, their corresponding Stan code and the former `00_check_setup.R` preflight are preserved unchanged in [`archive/`](archive/README.md), alongside older experiments. **Scripts 00 (setup), 01 (fitting) and 02 (plotting), plus the matching Stan model, are active.** Setup is separate from sampling. The earlier `archive/scripts/00_check_setup.R` is a different, obsolete preflight.
 
 ### Run from Positron
 
 1. Open the **Oxygen-Reduction-Joint-Model** repository folder as the working directory.
 2. Copy the unchanged private source `Uwe_HP_data_prepared.csv` into `data/`; it must not be committed.
-3. Ensure R packages `tidyverse`, `posterior`, `cmdstanr` and CmdStan are installed.
+3. Ensure R packages `tidyverse`, `posterior`, `cmdstanr`, `viridisLite` and CmdStan are installed.
 4. To inspect or prepare the model **without sampling**, run:
 
 ```r
@@ -39,6 +40,14 @@ source("scripts/01_DO_dual_pathway_kinetics.R")
 
 Script 01 automatically sources `00_setup.R` again to guarantee fresh inputs. All configuration—including `run_CV`, the DO boundaries, MCMC settings and file paths—is defined **only** in `scripts/00_setup.R`. Running `00_setup.R` alone never compiles or samples Stan.
 
+6. **Create or re-create all figures without rerunning MCMC:**
+
+```r
+source("scripts/02_DO_plotting.R")
+```
+
+Script 02 sources the setup **only to read model inputs** and reads existing CSV summaries from `outputs/01_DO_dual_pathway_kinetics/`. It does **not** compile Stan, load posterior fit objects or call `$sample()`. It prints figures to Positron's **Plots** pane when run in the **R console** and independently saves all PNG files to `plots/01_DO_dual_pathway_kinetics/`.
+
 The initial run fits **two full models only** (four chains per model). The model-runner saves each fitted posterior immediately before producing reports. Results appear in:
 
 ```text
@@ -46,7 +55,7 @@ outputs/01_DO_dual_pathway_kinetics/
 plots/01_DO_dual_pathway_kinetics/
 ```
 
-First inspect `fit_status.csv` and `sampler_chains.csv`. Then examine `global_posteriors.csv`, `well_posteriors.csv`, `identifiability.csv` and the joint-posterior plot. Do **not** interpret model parameters if full-fit diagnostics fail.
+First inspect `fit_status.csv` and `sampler_chains.csv`. Then examine `global_posteriors.csv`, `well_posteriors.csv` and `identifiability.csv`. Run **02** to produce the plots. Do **not** interpret model parameters if full-fit diagnostics fail.
 
 **Grouped held-out DO comparison:** After both full fits converge, set `run_CV = TRUE` in the top-level `cfg` list of `scripts/00_setup.R`. It runs five matched grouped folds for both kinetic orders (10 extra fits), saves CV diagnostics and predictions, and performs a matched group bootstrap only if all folds converge. Source-tracer observations are retained for the held-out wells; their DO observations are masked.
 
@@ -68,3 +77,9 @@ A converged sampler demonstrates computational reliability, **not** structural i
 ### Obsolete local `0_setup.R` (one zero)
 
 The previous local `scripts/0_setup.R` is **not** the new `scripts/00_setup.R`. It was an incorrectly named copy of the MCMC runner (contained `cmdstan_model()` and `$sample()`). It is not in the current GitHub tree and cannot be removed remotely from a local working copy. Preserve it outside the repository if needed, but **do not run it**. The correct setup file has **two zeros**: `scripts/00_setup.R`.
+
+### Plotting and source colours
+
+The plotting-only script creates seven standard PNG figures: observed vs fitted DO; δ¹⁸O–chloride two-endmember mixing; per-well LSR fractions; LSR DO deficit vs aquifer rate; LSR pre-water-table vs aquifer DO loss; source-pathway DO decay; and DO residuals versus MRT. An eighth plot of held-out DO predictions is generated if `cv_predictions.csv` exists.
+
+All data colours use **Turbo** from `viridisLite`; **river recharge is Turbo blue and rainfall/LSR is Turbo red**. The continuous LSR-fraction scale is explicitly limited to the Turbo blue–red range. Aquifer loss across both sources uses Turbo green so it cannot be confused with river recharge. Neutral grey is used only for reference lines. Graphs are printed explicitly and saved at 300 dpi. The well-wise intervals stored by script 01 are `q5`–`q95` (90% posterior credible), while `global_posteriors.csv` contains central 95% intervals. The fitted DO chart is in-sample; the optional CV chart alone represents held-out predictions.
