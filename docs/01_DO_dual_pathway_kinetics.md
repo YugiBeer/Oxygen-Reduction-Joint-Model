@@ -147,3 +147,21 @@ failed_sampling=3500L,
 Then source script 05 again. This reads the existing fit/status files and resamples **only the failing model in fold 3**, leaving the other 19 fits untouched. The old fit is preserved at `*.previous_fail.rds`, and sampling-iteration counts are recorded in fit status. Afterwards, reset `run_only_fold=NULL` and `refit_failed=FALSE` for subsequent full report refreshes. The original 20-fold design fingerprint and existing fits remain compatible; changes to the input data or Stan model are not silently reused.
 
 The four current RMSEs are **1.64 (fixed zero), 1.59 (fixed first), 1.57 (broad zero), 1.60 (broad first)** mg/L. These differences are small; do not claim a preferred kinetic order or a CV improvement for the broad river prior without the paired group-bootstrap uncertainty.
+
+### Simple DO-site exclusion in grouped CV
+
+The **only exclusion setting** for script 05 is at the top of
+`scripts/05_river_DO_grouped_CV.R`:
+
+```r
+include_2801_DO = FALSE,
+exclude_DO_sites = "2130", # omit 2130 DO from ALL training and scoring
+```
+
+This defaults to a **39-well regional CV**. It masks 2130's DO from every fit (not merely the scored predictions), but **retains its δ¹⁸O and chloride** in the conservative mixing likelihood. The original private CSV and the standard `00_setup.R` remain unchanged. The historical 40-well analysis is preserved.
+
+Outputs are automatically isolated in `outputs/05_river_DO_grouped_CV/2801_masked_no2130/`. To return to the original 40-well setup, change the one setting to `exclude_DO_sites = NULL`; that selects the existing `2801_masked/` output directory and reuses the previous completed fits. All five folds are generated afresh for the 39 scored wells.
+
+Script `02_DO_plotting.R` recognizes both paths, with and without 2130, automatically. With the default excluded-site configuration it labels plots accordingly and makes no claim to predict 2130. All fit/scoring diagnostics and grouped uncertainty comparisons remain separate across these two designs.
+
+**Scientific rationale:** 2130 is a shallow water-race-adjacent observation in the far west that may not represent regional aquifer groundwater. This is a hydrogeological *representativeness exclusion*, not an attempt to manipulate fit residuals. The original 40-well model and its CV are retained for sensitivity reporting.

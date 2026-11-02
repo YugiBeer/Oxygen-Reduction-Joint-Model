@@ -617,7 +617,10 @@ for (proxy_suite in c("2801_included","2801_masked")) {
 # 11–12: Optional grouped 5-fold CV of fixed river DO versus broad
 # river DO Normal(7.5,1.5^2) prior. The study samples are paired across
 # both kinetic orders; site 2801 is NEVER scored. Plot-only.
-for (proxy_suite in c("2801_masked","2801_in_training")) {
+for (proxy_suite in c(
+  "2801_masked_no2130", "2801_in_training_no2130",
+  "2801_masked", "2801_in_training"
+)) {
   cvdir05 <- file.path(
     "outputs","05_river_DO_grouped_CV",proxy_suite
   )
@@ -648,6 +651,7 @@ for (proxy_suite in c("2801_masked","2801_in_training")) {
             " incomplete or sampler diagnostics failed: ",
             "figures are provisional; do not rank models.")
   cv05_nfolds <- max(sc05$folds_completed,na.rm=TRUE)
+  excluded_2130 <- !("2130" %in% cv05$Site_ID)
   cv05 <- cv05 %>% mutate(
     order_label=order_label(aquifer_order),
     scenario=factor(
@@ -685,13 +689,14 @@ for (proxy_suite in c("2801_masked","2801_in_training")) {
       ),
       subtitle=paste(
         cv05_nfolds,"/5 matched folds: predicted mean and 95%",
-        "predictive interval. 2130 labelled.",
+        "predictive interval.",
+         if (excluded_2130) "2130 excluded." else "2130 labelled.",
         if (is_complete05) "" else "PRELIMINARY."
       ),
       x="Observed held-out DO (mg/L)",
       y="Predicted held-out DO (mg/L)",
       caption=paste(
-        "2801 DO",if(proxy_suite=="2801_masked")
+        "2801 DO",if(startsWith(proxy_suite,"2801_masked"))
         "masked in every training fit" else
         "included in training but never scored",
         "; O18 and Cl retained for all sites."
@@ -726,7 +731,7 @@ for (proxy_suite in c("2801_masked","2801_in_training")) {
       abs(predicted_broad-observed_DO)-
       abs(predicted_fixed-observed_DO)
   )
-  if (nrow(paired05)==2L*(nrow(d)-1L)) {
+  if (nrow(paired05)==2L*length(unique(cv05$sample_index))) {
     pdelta <- ggplot(
       paired05,aes(
         reported_MRT,delta_abs_error,

@@ -37,6 +37,7 @@ source("scripts/00_setup.R",local=TRUE)
 cfg05 <- list(
   stan="stan/04_river_DO_prior_sensitivity.stan",
   include_2801_DO=FALSE, # PRIMARY: keep original 2801 DO masked
+  exclude_DO_sites="2130", # ONE-LINE EXCLUSION: mask DO in ALL fits and CV
   scenarios=tibble::tibble(
     scenario=c("A_fixed_7p5","C_prior_sd1p5"),
     infer_river_DO=c(0L,1L),
@@ -79,8 +80,18 @@ if (d$DO_original[proxy_index]!=10.2)
   warning("Original 2801 DO differs from expected 10.2 mg/L: ",
           d$DO_original[proxy_index],
           ". Confirm local private data before interpreting sensitivity.")
-if (!("2130" %in% d$Site_ID))
-  stop("Site 2130 missing. Check the private input.")
+# Site IDs are excluded ONLY from the DO likelihood and CV scoring.
+# Their delta18O and chloride observations remain available for mixing.
+exclude_DO_sites <- unique(as.character(cfg05$exclude_DO_sites))
+if (anyNA(exclude_DO_sites) ||
+    any(!grepl("^[A-Za-z0-9_]+$",exclude_DO_sites)))
+  stop("exclude_DO_sites must contain valid Site_ID strings.")
+if (any(!exclude_DO_sites %in% d$Site_ID))
+  stop("Unknown excluded DO site(s): ",
+       paste(setdiff(exclude_DO_sites,d$Site_ID),collapse=", "))
+if (cfg$river_proxy_site %in% exclude_DO_sites)
+  stop("2801 already has a separate DO inclusion control.")
+excluded_ix <- which(d$Site_ID %in% exclude_DO_sites)
 if (!isTRUE(all.equal(
   sort(cfg05$scenarios$scenario),
   c("A_fixed_7p5","C_prior_sd1p5")
@@ -88,6 +99,11 @@ if (!isTRUE(all.equal(
   stop("Unexpected CV scenarios: update the paired comparison logic.")
 
 suite <- if (cfg05$include_2801_DO) "2801_in_training" else "2801_masked"
+# New exclusion suites MUST NOT reuse the previous 40-well CV fits.
+if (length(exclude_DO_sites))
+  suite <- paste0(
+    suite,"_no",paste(sort(exclude_DO_sites),collapse="_")
+  )
 cvdir <- file.path("outputs","05_river_DO_grouped_CV",suite)
 dir.create(cvdir,recursive=TRUE,showWarnings=FALSE)
 out05 <- function(file) file.path(cvdir,file)
@@ -95,11 +111,13 @@ scenarios <- cfg05$scenarios
 
 # Score all non-proxy wells with DO and MRT. Site 2801 is NEVER scored,
 # including in the "2801_in_training" sensitivity suite.
-eligible05 <- which(stan_data$has_DO==1L &
-                    d$Site_ID!=cfg$river_proxy_site)
+eligible05 <- which(
+  stan_data$has_DO==1L &
+    !(d$Site_ID %in% c(cfg$river_proxy_site,exclude_DO_sites))
+)
 stopifnot(
-  length(eligible05)==nrow(d)-1L,
-  !any(eligible05==proxy_index),
+  length(eligible05)==nrow(d)-1L-length(excluded_ix),
+  !any(eligible05 %in% c(proxy_index,excluded_ix)),
   all(is.finite(d$DO_original[eligible05]))
 )
 
@@ -129,12 +147,20 @@ if (any(vapply(split(foldmap$fold,foldmap$cv_group),
                function(f) length(unique(f))>1,logical(1))))
   stop("A CV group has been split between folds.")
 if (!all(foldmap$sample_index %in% eligible05))
-  stop("2801 would leak into CV scoring.")
+  stop("An excluded DO site would leak into CV scoring.")
 stopifnot(nrow(foldmap)==length(eligible05))
 
 xbase <- stan_data
 xbase$DO_obs <- as.numeric(d$DO_original)
 xbase$has_DO[proxy_index] <- as.integer(cfg05$include_2801_DO)
+# Excluded sites' DO is never used to calibrate global parameters,
+# including when OTHER wells are held out. Clear the values as well.
+xbase$has_DO[excluded_ix] <- 0L
+xbase$DO_obs[excluded_ix] <- 0
+stopifnot(
+  all(xbase$has_DO[excluded_ix]==0L),
+  all(xbase$DO_obs[excluded_ix]==0)
+)
 
 # Reproducibility/resume guard. Editing priors, input, folds, sampling,
 # source code or Stan code requires a new suite directory. Prevent
@@ -186,20 +212,25 @@ readr::write_csv(
   ) %>%
     dplyr::mutate(
       proxy_2801_DO_used_for_training=cfg05$include_2801_DO,
+      DO_excluded=Site_ID %in% exclude_DO_sites,
       selected_for_CV=sample_index %in% eligible05
     ),
   out05("study_samples.csv")
 )
 
 message("\n05 GROUPED CV: ",suite,
-        "; 40 non-proxy wells in ",cfg05$folds,
+        "; ",length(eligible05)," scored wells in ",cfg05$folds,
         " grouped folds; 4 models; 20 planned fits.")
 message("BROAD river prior = Normal(",cfg$river_DO_boundary,
         ", 1.5^2) truncated to [0,14.65] mg/L.")
 message("Site 2801 actual DO=",d$DO_original[proxy_index],
         " mg/L; use in TRAINING: ",cfg05$include_2801_DO,
         "; scored: NEVER.")
-message("Site 2130 will be held out as part of its assigned fold.")
+if (length(exclude_DO_sites))
+  message("DO excluded from ALL training/validation fits: ",
+          paste(exclude_DO_sites,collapse=", "),
+          " (tracer observations RETAINED).")
+else message("All non-proxy wells are eligible for held-out DO scoring.")
 
 # Diagnostics: check all sampled latent parameters, source chemistry,
 # global DO parameters and the key aggregate LSR loss quantity. The
@@ -283,7 +314,9 @@ for (fold in selected_folds) {
         all(x$has_O18==stan_data$has_O18),
         all(x$has_Cl==stan_data$has_Cl),
         !any(held==proxy_index),
-        x$has_DO[proxy_index]==as.integer(cfg05$include_2801_DO)
+        x$has_DO[proxy_index]==as.integer(cfg05$include_2801_DO),
+        all(x$has_DO[excluded_ix]==0L),
+        all(x$DO_obs[excluded_ix]==0)
       )
       # Permit a targeted retry with longer chains without changing
       # the base design or discarding the other 19 completed fits.
@@ -437,8 +470,9 @@ readr::write_csv(statuses,out05("cv_fit_status.csv"))
 if (anyDuplicated(preds %>%
                   dplyr::select(scenario,aquifer_order,sample_index)))
   stop("Duplicate held-out predictions; inspect cached fold files.")
-if (any(preds$Site_ID==cfg$river_proxy_site))
-  stop("2801 must never be CV-scored.")
+if (any(preds$Site_ID %in%
+        c(cfg$river_proxy_site,exclude_DO_sites)))
+  stop("2801 and excluded DO sites must never be CV-scored.")
 if (anyNA(preds$observed_DO) ||
     anyNA(preds$predicted_DO))
   stop("Missing held-out predictions.")
@@ -504,7 +538,7 @@ if (nrow(site2130)>0) {
 }
 
 if (complete && all_pass) {
-  # Construct 40 fully paired held-out observations, without imputation.
+  # Construct the fully paired held-out observations, without imputation.
   paired <- preds %>% dplyr::select(
     sample_index,Site_ID,cv_group,reported_MRT,observed_DO,
     scenario,aquifer_order,predicted_DO
