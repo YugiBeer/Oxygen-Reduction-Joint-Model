@@ -125,13 +125,36 @@ well_vars <- c(
   "f_LSR","mean_DO","true_MRT",
   "vadose_LSR_DO_loss","aquifer_DO_loss"
 )
-wide <- well %>%
-  filter(variable %in% well_vars) %>%
+# Stan/CmdStanR reports array elements as "f_LSR[1]", "mean_DO[1]",
+# etc. The *base* variable name is the key for pivot_wider(), while the
+# bracket index identifies the well. Filtering on the raw indexed name
+# silently returns zero rows, which was the source of the missing columns.
+indexed_well <- well %>%
+  mutate(
+    parameter=sub("\\[[0-9]+\\]$", "", variable),
+    index_from_variable=suppressWarnings(as.integer(
+      stringr::str_match(variable, "\\[([0-9]+)\\]$")[,2]
+    ))
+  ) %>%
+  filter(parameter %in% well_vars)
+
+if (nrow(indexed_well)==0L)
+  stop("No per-well posterior variables found. Expected indexed names ",
+       "such as f_LSR[1] and mean_DO[1] in ",well_file)
+if (anyNA(indexed_well$index_from_variable) ||
+    any(indexed_well$index_from_variable!=indexed_well$sample_index))
+  stop("Inconsistent well index: variable brackets and sample_index ",
+       "disagree in ",well_file)
+if (anyDuplicated(indexed_well %>%
+                  select(aquifer_order,sample_index,parameter)))
+  stop("Duplicate well-parameter records in ",well_file)
+
+wide <- indexed_well %>%
   select(aquifer_order,sample_index,Site_ID,DO_original,
-         MRT,variable,median,q5,q95) %>%
+         MRT,parameter,median,q5,q95) %>%
   tidyr::pivot_wider(
-    names_from=variable,values_from=c(median,q5,q95),
-    names_glue="{.value}_{variable}"
+    names_from=parameter,values_from=c(median,q5,q95),
+    names_glue="{.value}_{parameter}"
   ) %>%
   mutate(order_label=order_label(aquifer_order))
 expected <- c(
