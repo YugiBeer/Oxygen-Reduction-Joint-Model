@@ -167,3 +167,24 @@ source("scripts/02_DO_plotting.R")
 
 
 Script 02 automatically picks up available CV outputs and creates plots 11 (held-out observed/predicted DO, 95% predictive intervals, 2130 labelled) and 12 (per-well change in absolute error for broad prior minus fixed). **No MCMC occurs in script 02.**
+
+#### Reviewing CV diagnostics and selectively retrying a single fold
+
+The original script 05 had a **false-negative `all_folds_complete` flag** caused by comparing integer sample indices with CSV-loaded double indices using `identical()`. This is now fixed by explicit integer-normalised set checks. `cv_scores.csv` now reports convergence **per scenario × kinetic order**, instead of marking all four models as failed if a single fold fails.
+
+The first 20-fit run completed 5/5 folds and 40 predictions per model. Only **`C_prior_sd1p5` × first-order × fold 3** failed the additional tail-ESS threshold (**116 vs minimum 200**); it had R-hat 1.01, bulk ESS 431, and no divergent transitions. This does **not** imply poor predictive accuracy or invalidate the other 19 fits, but uncertainty tails for that fold need better sampling.
+
+**No MCMC needed to correct the scores:** pull the updated script, then source `scripts/05_river_DO_grouped_CV.R` with the default `cfg05$refit_failed=FALSE`. It reuses all existing RDS fit objects, rewrites the corrected flags and scores and reports the single failing fold.
+
+To **rerun only the failed fit**, edit the `cfg05` settings near the top of script 05:
+
+```r
+run_only_fold=3L,
+resume=TRUE,
+refit_failed=TRUE,
+failed_sampling=3500L,
+```
+
+Then source script 05 again. This reads the existing fit/status files and resamples **only the failing model in fold 3**, leaving the other 19 fits untouched. The old fit is preserved at `*.previous_fail.rds`, and sampling-iteration counts are recorded in fit status. Afterwards, reset `run_only_fold=NULL` and `refit_failed=FALSE` for subsequent full report refreshes. The original 20-fold design fingerprint and existing fits remain compatible; changes to the input data or Stan model are not silently reused.
+
+The four current RMSEs are **1.64 (fixed zero), 1.59 (fixed first), 1.57 (broad zero), 1.60 (broad first)** mg/L. These differences are small; do not claim a preferred kinetic order or a CV improvement for the broad river prior without the paired group-bootstrap uncertainty.

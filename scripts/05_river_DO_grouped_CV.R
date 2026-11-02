@@ -45,6 +45,8 @@ cfg05 <- list(
   folds=5L,
   run_only_fold=NULL,    # e.g. 1L for a one-fold test; NULL for all 5
   resume=TRUE,           # safely reuse existing fit_*.rds files
+  refit_failed=FALSE,    # TRUE: refit ONLY cached failed fits
+  failed_sampling=3500L, # longer sampling for selective retry
   seed=cfg$seed+5000L,
   chains=cfg$chains,
   parallel_chains=cfg$parallel_chains,
@@ -62,6 +64,9 @@ if (!file.exists(cfg05$stan))
   stop("Missing Stan model: ",cfg05$stan)
 if (cfg05$folds<2L)
   stop("CV requires at least two folds.")
+if (cfg05$refit_failed &&
+    cfg05$failed_sampling <= cfg05$sampling)
+  stop("failed_sampling must exceed the original sampling iterations.")
 if (!is.null(cfg05$run_only_fold) &&
     (!length(cfg05$run_only_fold) ||
      anyNA(cfg05$run_only_fold) ||
@@ -280,36 +285,75 @@ for (fold in selected_folds) {
         !any(held==proxy_index),
         x$has_DO[proxy_index]==as.integer(cfg05$include_2801_DO)
       )
-      if (file.exists(fitfile)) {
+      # Permit a targeted retry with longer chains without changing
+      # the base design or discarding the other 19 completed fits.
+      # The previous failing RDS remains available as .previous_fail.rds.
+      old_status <- if (file.exists(statusfile))
+        readr::read_csv(statusfile,show_col_types=FALSE)
+      else NULL
+      retry_this <- cfg05$refit_failed &&
+        file.exists(fitfile) &&
+        !is.null(old_status) &&
+        nrow(old_status)==1L &&
+        !isTRUE(old_status$all_diagnostics_pass[[1]])
+      if (file.exists(fitfile) && !retry_this) {
         if (!cfg05$resume)
           stop("Existing fit object ",fitfile,
                " and resume=FALSE: refusing to overwrite.")
         message("REUSE CV FIT: ",tag)
         fit <- readRDS(fitfile)
+        iter_used <- if (!is.null(old_status) &&
+                         "iter_sampling_used" %in% names(old_status))
+          as.integer(old_status$iter_sampling_used[[1]])
+        else cfg05$sampling
       } else {
-        message("SAMPLE CV: ",tag,
-                " | held out ",length(held)," DO observations")
+        if (retry_this && !cfg05$resume)
+          stop("Selective retry requires resume=TRUE.")
+        iter_used <- if (retry_this)
+          cfg05$failed_sampling
+        else cfg05$sampling
+        message(
+          if (retry_this) "RETRY FAILED CV FIT: " else "SAMPLE CV: ",
+          tag," | held out ",length(held),
+          " DO observations | sampling iterations=",iter_used
+        )
         fit <- model$sample(
           data=x,
           seed=as.integer(
-            cfg05$seed+10001L*fold+1000L*aq_order+37L*sc_i
+            cfg05$seed+10001L*fold+1000L*aq_order+37L*sc_i+
+              if (retry_this) 1000003L else 0L
           ),
           chains=cfg05$chains,
           parallel_chains=cfg05$parallel_chains,
           iter_warmup=cfg05$warmup,
-          iter_sampling=cfg05$sampling,
+          iter_sampling=iter_used,
           adapt_delta=cfg05$adapt_delta,
           max_treedepth=cfg05$max_treedepth,
           refresh=250
         )
         # Save BEFORE downstream diagnostics/scoring.
-        fit$save_object(file=fitfile)
+        if (retry_this) {
+          staged <- paste0(fitfile,".retry.rds")
+          archived <- paste0(fitfile,".previous_fail.rds")
+          if (file.exists(staged) || file.exists(archived))
+            stop("Retry staging/archive already exists for ",fitfile,
+                 "; inspect before overwriting anything.")
+          fit$save_object(file=staged)
+          if (!file.rename(fitfile,archived))
+            stop("Could not archive previous failed fit ",fitfile)
+          if (!file.rename(staged,fitfile)) {
+            file.rename(archived,fitfile)
+            stop("Could not promote retried fit; old fit restored.")
+          }
+        } else fit$save_object(file=fitfile)
       }
 
       chk <- check05(
         fit,scenario$scenario,aq_order,fold,
         as.integer(scenario$infer_river_DO)
       )
+      chk$status$iter_sampling_used <- iter_used
+      chk$status$was_selectively_refit <- retry_this
       readr::write_csv(chk$status,statusfile)
       readr::write_csv(chk$parameters,diagfile)
       if (!chk$status$all_diagnostics_pass)
@@ -409,17 +453,40 @@ scores <- preds %>%
     coverage95=mean(covered95),
     .groups="drop"
   )
+# Readr may load sample_index as double while eligible05 is integer.
+# identical() compares STORAGE TYPES and was incorrectly marking all
+# folds incomplete despite valid 40/40 unique held-out predictions.
+# Use an integer-normalised set check with counts and no duplication.
+coverage <- preds %>%
+  dplyr::group_by(scenario,aquifer_order) %>%
+  dplyr::summarise(
+    all_folds_complete=
+      (dplyr::n()==length(eligible05)) &&
+      (dplyr::n_distinct(fold)==cfg05$folds) &&
+      !anyDuplicated(as.integer(sample_index)) &&
+      setequal(as.integer(sample_index),eligible05),
+    .groups="drop"
+  )
+quality <- statuses %>%
+  dplyr::group_by(scenario,aquifer_order) %>%
+  dplyr::summarise(
+    all_MCMC_pass=
+      (dplyr::n()==cfg05$folds) &&
+      (dplyr::n_distinct(fold)==cfg05$folds) &&
+      all(all_diagnostics_pass %in% TRUE),
+    .groups="drop"
+  )
+scores <- scores %>%
+  dplyr::left_join(coverage,by=c("scenario","aquifer_order")) %>%
+  dplyr::left_join(quality,by=c("scenario","aquifer_order")) %>%
+  dplyr::mutate(
+    all_folds_complete=dplyr::coalesce(all_folds_complete,FALSE),
+    all_MCMC_pass=dplyr::coalesce(all_MCMC_pass,FALSE)
+  )
 complete <- nrow(completed)==cfg05$folds*2L*nrow(scenarios) &&
-  all(vapply(
-    split(preds$sample_index,
-          interaction(preds$scenario,preds$aquifer_order,
-                      drop=TRUE)),
-    function(ii) identical(sort(ii),eligible05),logical(1)
-  ))
+  all(scores$all_folds_complete)
 all_pass <- nrow(statuses)==nrow(completed) &&
-  all(statuses$all_diagnostics_pass)
-scores$all_folds_complete <- complete
-scores$all_MCMC_pass <- all_pass
+  all(scores$all_MCMC_pass)
 readr::write_csv(scores,out05("cv_scores.csv"))
 cat("\n05 GROUPED CV SCORES (read flags before comparison)\n")
 print(scores,n=Inf,width=Inf)
