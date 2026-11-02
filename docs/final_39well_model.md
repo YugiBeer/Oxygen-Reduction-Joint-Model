@@ -14,13 +14,13 @@ Positive measured MRT values use non-centred lognormal uncertainty (log-SD 0.25)
 
 ## Model selection and principal estimates
 
-Five-fold grouped CV (39 held-out DO observations per model, 20 matched fits) compares fixed and broad river DO × both aquifer kinetic orders, using grouped bootstrap paired differences. In the fixed river-DO scenario, first-order RMSE improvement over zero-order is median 0.132 mg/L (95% bootstrap improvement 0.0126–0.238 mg/L); the corresponding MAE interval overlaps zero. Broader river DO does not improve first-order predictive RMSE. First order / fixed river DO is preferred for its CV performance and parsimony, not considered proven uniquely correct.
+Five-fold grouped CV (39 held-out DO observations per model, 20 matched fits) compares fixed and broad river DO × both aquifer kinetic orders, using grouped bootstrap paired differences. In the fixed river-DO scenario, first-order RMSE improvement over zero-order is median 0.132 mg/L (95% bootstrap improvement 0.0126–0.238 mg/L); the corresponding MAE interval overlaps zero. Broader river DO does not improve first-order predictive RMSE. First-order kinetics are preferred. Although fixed river DO has slightly better grouped CV RMSE, the final *physical primary* formulation uses the **uncertain river DO boundary** to avoid treating 7.5 mg/L as exactly known. The fixed-boundary first-order model is retained as the predictive comparator. This distinction should be explicit in reporting.
 
 The preferred model posterior has:
 - `aquifer_rate_actual`: median 0.0625 yr^-1 (95% CrI 0.0484–0.0812)
 - `LSR_DO_at_water_table`: 3.28 mg/L (95% CrI 1.42–5.47)
 - `LSR_DO_deficit`: 6.72 mg/L (95% CrI 4.53–8.58)
-- `river_DO`: 7.5 mg/L fixed (not inferred)
+- `river_DO`: 7.5 mg/L fixed (not inferred) in this **fixed-boundary comparator**; the selected uncertain-boundary primary estimates **7.66 mg/L** (95% CrI **5.75–9.74**), first-order rate **0.0632 yr^-1** (95% CrI **0.0453–0.0851**), LSR WT DO **3.21 mg/L** (95% CrI **1.25–5.55**) and LSR deficit **6.79 mg/L** (95% CrI **4.45–8.75**).
 
 In the broad river DO / first-order sensitivity: reaction rate ~0.0632 yr^-1, LSR deficit ~6.79 mg/L. The preferred model's posterior correlation of LSR DO deficit vs aquifer rate is approximately -0.397. Broad river DO / first-order shows correlation +0.544 between inferred river DO and aquifer reaction rate, indicating some parameter trade-off.
 
@@ -35,3 +35,13 @@ The LSR deficit is inferred, **not** a direct measurement of unsaturated-zone ox
 ## Active workflow
 
 Use `scripts/00_setup.R` (preflight), `scripts/04_river_DO_prior_sensitivity.R` (four full-data posterior fits), `scripts/05_river_DO_grouped_CV.R` (matched CV with cache), `scripts/02_DO_plotting.R` (plot final 04/05 CSVs) and `scripts/06_DO_posterior_distributions.R` (plot saved posterior draws). Current RDS/CSV outputs remain local and gitignored. Older protocols and scripts are archived rather than deleted.
+
+## Targeted LSR/MRT sensitivity study (script 07; not yet run)
+
+This study isolates three previously untested assumption categories, **one factor at a time**, using the selected first-order aquifer kinetics and broad river-DO prior (mean 7.5, SD 1.5 mg/L). It **reuses** the validated `04` posterior `fit_C_prior_sd1p5_order1.rds` as the baseline and writes new results separately under `outputs/07_DO_LSR_MRT_sensitivity/2801_masked_no2130/`.
+
+- **Surface DO saturation** at assumed LSR recharge temperatures of 10, 15 (baseline) and 20°C. Changing this alters both the land-surface DO reference and the prior induced on water-table DO.
+- **LSR survival prior** on the water-table fraction: Beta(1,1) baseline, Beta(2,2), Beta(2,5) and Beta(5,2). The alternatives are deliberately contrasting prior-sensitivity probes and are not independently justified hydrological priors.
+- **MRT uncertainty** log-standard deviation 0.10, 0.25 baseline and 0.50. The model still assumes the same well-specific aquifer residence time for both recharge pathways.
+
+Seven additional full-data posterior fits are required. The script checks all essential sampling diagnostics and writes `rate_sensitivity.csv` with each posterior median, 95% credible interval and percentage change relative to baseline. It produces four PNG figures. Only report a robustness conclusion after all seven new fits have passed and the estimated rate changes have been inspected. In particular, a stable posterior across these assumptions would **not** validate the common-MRT or progressive-LSR conceptual simplification; source-specific flowpath ages remain untested.
