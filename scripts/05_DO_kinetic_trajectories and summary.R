@@ -1,10 +1,12 @@
 # 05_DO_kinetic_trajectories and summary.R
 #
-# TWO complementary DO vs MRT plots for the preferred model:
+# THREE complementary DO vs MRT plots for the preferred model:
 #  1. Observed mixed-groundwater DO against its sample-specific fitted DO
 #     (mean_DO), with 95% posterior predictive intervals (replicated_DO).
-#  2. Sample-specific DO attributable to river recharge,
-#     (1 - f_LSR) * river_DO_after_aquifer, alongside the posterior
+#  2. RAW measured mixed-groundwater DO against the posterior river-only
+#     100%-river reference (no sample-level fitted DO in this panel).
+#  3. Sample-specific DO attributable to river recharge,
+#     (1 - f_LSR) * river_DO_after_aquifer, alongside the same
 #     100%-river reference trajectory.
 #
 # The river-only trajectory is NOT the fitted mean of the mixed samples.
@@ -179,6 +181,7 @@ p_fit05 <- ggplot2::ggplot(wells05,ggplot2::aes(x=MRT)) +
   ggplot2::scale_y_continuous(
     expand=ggplot2::expansion(mult=c(.03,.06))
   ) +
+  ggplot2::coord_cartesian(ylim=c(0,11)) +
   ggplot2::labs(
     title="Observed and model-fitted groundwater DO",
     subtitle="Open circles / crosses: measured DO; coloured points: fitted mixed-groundwater DO",
@@ -190,7 +193,52 @@ save05(p_fit05,
        paste0("13_DO_observed_vs_fitted_mixed_",suite05,".png"),
        width=11,height=7.5)
 
-# 2. River-derived contribution to each mixed groundwater sample.
+# 2. Observed mixed samples against the 100%-river-only reference.
+# This is intentionally a PROCESS REFERENCE, not a model-observation
+# goodness-of-fit plot. All observed points include their LSR fraction.
+p_raw05 <- ggplot2::ggplot() +
+  ggplot2::geom_ribbon(
+    data=curve05,
+    ggplot2::aes(x=MRT,ymin=lower95,ymax=upper95),
+    fill=river_blue05,alpha=.16
+  ) +
+  ggplot2::geom_line(
+    data=curve05,
+    ggplot2::aes(x=MRT,y=median),
+    colour="grey20",linewidth=.9,linetype="longdash"
+  ) +
+  ggplot2::geom_point(
+    data=wells05,
+    ggplot2::aes(x=MRT,y=DO_observed,
+                 colour=f_LSR,shape=excluded_DO),
+    size=2.8,alpha=.95
+  ) +
+  ggplot2::geom_text(
+    data=excluded05,
+    ggplot2::aes(x=MRT,y=DO_observed,label=Site_ID),
+    colour="grey20",vjust=-.9,size=3.4,show.legend=FALSE
+  ) +
+  gradient05 +
+  ggplot2::scale_shape_manual(
+    values=c("FALSE"=16,"TRUE"=1),
+    labels=c("FALSE"="DO used in fit","TRUE"="DO excluded from fit"),
+    name="Observed DO"
+  ) +
+  ggplot2::scale_y_continuous(
+    limits=c(0,NA),expand=ggplot2::expansion(mult=c(0,.05))
+  ) +
+  ggplot2::labs(
+    title="First-order river reference with uncertain river DO",
+    subtitle="Raw groundwater DO (coloured by LSR fraction) versus 100% river-only first-order reference",
+    x="Reported groundwater MRT (years)",
+    y="Dissolved oxygen (mg/L)",
+    caption="The 95% blue band describes river-only model uncertainty, NOT a predictive interval for mixed groundwater samples."
+  ) + theme05
+save05(p_raw05,
+       paste0("14_DO_river_reference_raw_samples_",suite05,".png"),
+       width=11,height=7.5)
+
+# 3. River-derived contribution to each mixed groundwater sample.
 # Posterior contributions use JOINT draws of source fraction and river
 # concentration AFTER aquifer reaction, not products of separate medians.
 # The dashed line is the 100%-river REFERENCE, never the expected mixed DO.
@@ -234,7 +282,7 @@ p_river05 <- ggplot2::ggplot() +
     caption="Sample points = (1 - f_LSR) x river DO after aquifer reaction; vertical ranges and reference band are 95% posterior credible intervals."
   ) + theme05
 save05(p_river05,
-       paste0("14_DO_river_contribution_",suite05,".png"),
+       paste0("15_DO_river_contribution_",suite05,".png"),
        width=11,height=7.5)
 
 # ---- Four-parameter summary from the SAME preferred posterior --------
@@ -266,7 +314,7 @@ summary_table05 <- c(
   )),character(1))
 )
 summary_path05 <- file.path(
-  plot_dir05,paste0("15_DO_primary_posterior_summary_",suite05,".md")
+  plot_dir05,paste0("16_DO_primary_posterior_summary_",suite05,".md")
 )
 writeLines(enc2utf8(c(
   "# Preferred first-order DO model: posterior summary",
@@ -277,7 +325,8 @@ writeLines(enc2utf8(c(
   summary_table05,
   "",
   "The LSR DO deficit is a concentration difference, not a rate.",
-  "The DO vs MRT figures are in-sample posterior diagnostics, not held-out CV."
+  "The DO vs MRT figures are in-sample posterior diagnostics, not held-out CV.",
+  "Panel 2 plots raw sample DO against the river-only reference; its band is not a mixed-sample predictive interval."
 )),summary_path05,useBytes=TRUE)
 print(summary05,row.names=FALSE,digits=5)
 message("SUMMARY: ",normalizePath(summary_path05))
