@@ -2,7 +2,7 @@
 % Heretaunga Plains Bayesian oxygen reduction: analysis record and manuscript draft
 % Copyright remains with the report's author. No external data embedded.
 % Compile with: pdflatex heretaunga_do_model_report.tex (twice).
-% Four DO--MRT figures are exported by the active Positron R script; main text uses plots 1, 2 and 4:
+% Five DO--MRT figures are exported by the active Positron R script; the main report includes all five:
 %   scripts/05_DO_kinetic_trajectories and summary.R
 % Run that script from the repository root to regenerate PNGs under
 %   plots/final_39well/
@@ -59,13 +59,13 @@
 \newcommand{\repo}{\href{https://github.com/YugiBeer/Oxygen-Reduction-Joint-Model}{Oxygen-Reduction-Joint-Model}}
 \newcommand{\plotpath}{plots/04_river_DO_prior/2801_masked_no2130/posterior_distributions/}
 \newcommand{\cvplotpath}{plots/final_39well/}
-% Exact PNG outputs written by scripts/05_DO_kinetic_trajectories and summary.R.
-% Keep these filenames synchronised with the four save05() calls in that script.
-% Main report uses plots 1, 2 and 4; plot 3 remains available for optional supplementary use.
-\newcommand{\MRTplotOne}{13_DO_observed_vs_fitted_mixed_2801_masked_no2130.png}
-\newcommand{\MRTplotTwo}{14_DO_river_reference_raw_samples_2801_masked_no2130.png}
-\newcommand{\MRTplotThree}{15_DO_river_contribution_2801_masked_no2130.png}
-\newcommand{\MRTplotFour}{16_DO_fitted_components_2801_masked_no2130.png}
+% Five numbered PNGs written by scripts/05_DO_kinetic_trajectories and summary.R.
+% All five are included in the report. Filenames must match the save05() calls.
+\newcommand{\MRTplotOne}{01_DO_mixing_adjusted_decay_2801_masked_no2130.png}
+\newcommand{\MRTplotTwo}{02_DO_observed_vs_fitted_mixed_2801_masked_no2130.png}
+\newcommand{\MRTplotThree}{03_DO_river_reference_raw_samples_2801_masked_no2130.png}
+\newcommand{\MRTplotFour}{04_DO_river_contribution_2801_masked_no2130.png}
+\newcommand{\MRTplotFive}{05_DO_fitted_components_2801_masked_no2130.png}
 % Resolve paths when this .tex is at project root OR in project docs/.
 % Never point to phone-uploaded images or renamed copies in figures/.
 \newcommand{\fromPlotScript}[1]{%
@@ -106,7 +106,7 @@
 \vspace{3mm}
 \textbf{Analysis version:} regional 39-well DO likelihood, November 2026\\
 \textbf{Status:} final model, grouped cross-validation and seven-fit sensitivity analysis complete; three selected DO--MRT figures (script plots 1, 2 and 4), plus a separate conceptual source-decay illustration; source-specific flowpath ages unresolved\\
-\textbf{Source code:} \repo\ (script 05 exports four DO--MRT figures; the report uses plots 1, 2 and 4)\\
+\textbf{Source code:} \repo\ (script 05 exports five DO--MRT figures; all five appear in this report)\\
 \textbf{Data:} local, non-public prepared groundwater dataset (not included)
 \vspace{17mm}
 \begin{center}
@@ -134,7 +134,7 @@ Seven additional one-factor-at-a-time full-data fits examined recharge temperatu
 
 The most important unresolved question is structural: the model estimates a separate \emph{final mixing fraction} at each well but assigns the \emph{same well-specific MRT} to river and LSR components. It therefore does not simulate distributed LSR inflow along a flowpath or the shorter residence time of recharge entering downstream. This may affect partitioning of the observed oxygen depletion between LSR entry conditions and aquifer reaction, and is a priority for scientific interpretation rather than further MCMC chain length.
 
-Three selected script-generated DO--MRT plots (Figures~\ref{fig:mixedmrt}--\ref{fig:componentsmrt}; script plots 1, 2 and 4) distinguish \emph{observed mixed-groundwater DO}, \emph{fitted mixed-groundwater DO}, and the \emph{additive modelled river/LSR contributions}. The uncertainty whiskers represent different quantities and must not be treated as interchangeable.
+Five script-generated DO--MRT plots (Figures~\ref{fig:adjustedmrt}--\ref{fig:componentsmrt}) distinguish the common first-order decay relationship after adjustment for recharge composition, observed versus fitted groundwater DO, raw observations against a pure-river reference, the river-attributable DO component, and the additive river/LSR contributions. The uncertainty intervals represent different quantities and must not be treated as interchangeable.
 
 \section{Research question and analysis strategy}
 \subsection{Objectives}
@@ -150,7 +150,7 @@ Three selected script-generated DO--MRT plots (Figures~\ref{fig:mixedmrt}--\ref{
 \subsection{Evolution of the workflow}
 The modelling programme progressed from more elaborate mixing and reaction formulations toward a parsimonious two-source framework. Earlier development considered additional mixing tracers, including sodium and excess air, paired DO--excess nitrogen formulations, and denitrification-related alternatives. Including sodium caused MCMC convergence problems, whereas excess air provided limited added value and generated conflicting results; neither is retained in the adopted tracer set. Tests of spatially varying LSR oxygen availability did not materially improve the earlier grouped CV scores (reported RMSE approximately 1.815 versus 1.812\,\(\mgL\) for common and variable LSR DO, respectively). These were \emph{developmental comparisons}, not substitutes for the final regional 39-well validation.
 
-The final implementation retains \(\delta^{18}\mathrm{O}\) and chloride only as conservative mixing tracers, a single inferred LSR DO at the water table, and one common aquifer reaction law applied independently to each source before their contributions are mixed. This minimises unnecessary degrees of freedom while preserving uncertainty in endmember composition, source fractions, groundwater ages and rates. The Positron revisions reorganised the R scripts. The report selects three of the four DO--MRT figures generated by script 05 (plots 1, 2 and 4), directly from the saved selected first-order posterior, not by separately copying images. They illustrate different quantities rather than three independently fitted models. This PDF is a snapshot: to update it after regenerating plots, recompile the \LaTeX{} source. The conceptual source-decay figure in this report is a separate explanation. The core Stan likelihood and fitted kinetic model are unchanged.
+The final implementation retains \(\delta^{18}\mathrm{O}\) and chloride only as conservative mixing tracers, a single inferred LSR DO at the water table, and one common aquifer reaction law applied independently to each source before their contributions are mixed. This minimises unnecessary degrees of freedom while preserving uncertainty in endmember composition, source fractions, groundwater ages and rates. The Positron revisions reorganised the R scripts. The report includes all five DO--MRT figures from script 05, directly from the selected first-order posterior; none is a separately fitted regression or a copied screenshot. This PDF is a snapshot: to update it after regenerating plots, recompile the \LaTeX{} source. The conceptual source-decay figure in this report is a separate explanation. The core Stan likelihood and fitted kinetic model are unchanged.
 
 \begin{figure}[htbp]
 \centering
@@ -402,56 +402,88 @@ The LSR deficit is the \emph{difference between assumed surface DO and inferred 
 \label{fig:decay}
 \end{figure}
 
-\subsection{Three selected DO--MRT plots: observed concentrations, river reference and source contributions}
-\label{sec:threeplots}
-The active \path{scripts/05_DO_kinetic_trajectories and summary.R} exports \emph{four} complementary DO--MRT PNG files under \path{plots/final_39well/}. The report deliberately uses \textbf{script Plots 1, 2 and 4}. The original Plot 3 (river-derived share versus an unweighted 100\%-river reference) is still generated but not shown here, because the comparison of a weighted source contribution with a pure-source concentration can be misread as evidence of model misfit. All selected figures derive from the same preferred first-order posterior; there is no additional model fitting.
+\subsection{Five DO--MRT plots: observed concentrations, fitted kinetics and recharge contributions}
+\label{sec:fiveplots}
+The active \path{scripts/05_DO_kinetic_trajectories and summary.R} exports five PNGs under \path{plots/final_39well/}. All five appear below in the same sequence as the script. They are complementary views of one jointly fitted first-order Bayesian model, not five independent regressions.
 
 \begin{enumerate}[leftmargin=17pt,itemsep=4pt]
-\item \textbf{Plot 1: observed versus fitted mixed-groundwater DO (Figure~\ref{fig:mixedmrt}).} Open black circles show DO measured at sites included in the model likelihood; crosses identify observations excluded from it. Sites \site{2801} (measured DO 10.2\,mg/L; nominal MRT 0) and \site{2130} (8.8\,mg/L) are excluded from the DO likelihood but remain labelled. Coloured points are the posterior \emph{medians} of well-specific fitted mixed-groundwater DO, with colour denoting inferred LSR fraction. The whiskers are 95\% \emph{posterior predictive intervals} based on replicated DO, which include the model's observation-level residual variability. This is the direct comparison of the modelled and observed mixed samples.
-\item \textbf{Plot 2: raw measured mixed-sample DO versus a 100\%-river reference (Figure~\ref{fig:samplemrt}).} The sample points show \emph{raw measured DO}; the dashed line and blue ribbon are the posterior median and 95\% credible interval of the first-order river-only DO trajectory. As the groundwater samples contain variable LSR fractions, this river-only band is \emph{not} a prediction interval for observed mixed-groundwater DO. Sample observations below the curve do not, by themselves, demonstrate poor model fit.
-\item \textbf{Plot 4: fitted river and LSR DO contributions (Figure~\ref{fig:componentsmrt}).} The vertical blue and red segments give the \emph{river-derived} and \emph{LSR-derived} parts of the modelled DO concentration in each mixed sample. At each posterior draw, the two source contributions obey
+\item \textbf{Plot 1: mixing-adjusted measured DO and fitted first-order survival (Figure~\ref{fig:adjustedmrt}).} The initial oxygen concentration for well $i$ is inferred from its river/LSR mixture:
 \begin{align}
- C_{R,i} &= (1-f_i)\,C_{R,\mathrm{entry}}\exp(-k_1t_i),\\
- C_{\LSR,i} &= f_i\,C_{\LSR,\mathrm{WT}}\exp(-k_1t_i),\\
- \mu_i &= C_{R,i}+C_{\LSR,i},
+C_{0,i}&=(1-f_i)C_{R,\mathrm{entry}}+f_i C_{\LSR,\mathrm{WT}},\\
+\mu_i/C_{0,i}&=\exp(-k_1t_i).
 \end{align}
-where $f_i$ is the inferred LSR fraction and $t_i$ is the assumed shared aquifer residence time. The stacked blue and red segment heights are \emph{posterior means}, not posterior medians. This is intentional: $\mathbb{E}[C_{R,i}]+\mathbb{E}[C_{\LSR,i}]=\mathbb{E}[\mu_i]$, so the stacked total matches the black fitted-total point exactly. Open circles and crosses show the \emph{observed} sample DO, and grey whiskers give 95\% \emph{credible intervals for the fitted mean DO}, not posterior predictive intervals for a new observation. This panel shows how the two pathways combine to produce the fitted DO, and how their sum compares with measurement.
+Here $f_i$ is its LSR fraction, and $t_i$ is the modelled effective aquifer residence time. Each coloured marker is the measured DO divided by the posterior-inferred $C_{0,i}$ (median across posterior draws). The point whiskers are 95\% credible intervals \emph{from the inferred denominator only}; they are not intervals for the measurement error or full posterior predictive distribution. The dashed curve and ribbon are the posterior-median common survival $\exp(-k_1t)$ and 95\% credible interval in the fitted rate. The curve was \emph{not fitted independently to these adjusted points}. The horizontal axis shows reported MRT; the model instead uses latent uncertain MRT. The adjusted data are model-conditioned, not independent validation of $k_1$, and can exceed unit survival when observed DO is larger than the inferred entry concentration.
+
+\item \textbf{Plot 2: measured versus fitted mixed DO (Figure~\ref{fig:mixedmrt}).} Open circles are measured DO included in the likelihood; crosses are measurements excluded from the DO likelihood at \site{2801} (10.2\,mg/L; nominal MRT 0) and \site{2130} (8.8\,mg/L). Coloured points are posterior medians of sample-specific fitted mixed DO, with colour representing LSR fraction. Whiskers are 95\% \emph{posterior predictive} intervals based on replicated sample DO and include observation-level variability. This is the principal in-sample goodness-of-fit diagnostic.
+
+\item \textbf{Plot 3: raw groundwater DO against the pure-river reference (Figure~\ref{fig:samplemrt}).} Markers show raw measured mixed-sample DO; the dashed line and blue ribbon show the posterior median and 95\% credible interval of the 100\%-river first-order reference $C_{R,\mathrm{entry}}\exp(-k_1t)$. The river curve follows the fitted parameters but is \emph{not} itself a fitted regression through the observations or a predictive interval for mixed samples.
+
+\item \textbf{Plot 4: inferred river-attributable DO in mixed samples (Figure~\ref{fig:riverfractionmrt}).} Markers represent the river-derived contribution $(1-f_i)C_{R,\mathrm{entry}}\exp(-k_1t_i)$, derived from joint posterior draws; whiskers are credible intervals for this contribution. The reference curve is for unweighted, 100\%-river-derived groundwater. For large $f_i$, contributions necessarily lie below the reference. The gap does not independently estimate reaction loss or the quality of model fit.
+
+\item \textbf{Plot 5: additive river and LSR contributions (Figure~\ref{fig:componentsmrt}).} Source contributions are
+\begin{align}
+ C_{R,i}&=(1-f_i)C_{R,\mathrm{entry}}\exp(-k_1t_i),\\
+ C_{\LSR,i}&=f_i C_{\LSR,\mathrm{WT}}\exp(-k_1t_i),\\
+ \mu_i&=C_{R,i}+C_{\LSR,i}.
+\end{align}
+The blue river and red LSR segment heights are \emph{posterior means}, so they add exactly to the black posterior-mean fitted total DO. Open circles and crosses show observations, while grey whiskers are 95\% \emph{credible intervals for fitted mean DO}, not posterior predictive ranges. This plot explains the inferred composition of each fitted oxygen concentration.
 \end{enumerate}
 
-The selected figures therefore serve different purposes: Figure~\ref{fig:mixedmrt} assesses sample-level fit including predictive uncertainty; Figure~\ref{fig:samplemrt} illustrates the river-only kinetic reference against raw mixed samples; and Figure~\ref{fig:componentsmrt} decomposes the \emph{fitted mixed-sample DO} into two source components. None is independent validation of the model; predictive validation comes from grouped held-out cross-validation (Section~\ref{sec:crossvalidation}). The source decomposition remains conditional on the model's assumption that river and LSR components share the same well-specific MRT.
+Together, Plot 1 shows the first-order rate relationship after accounting for estimated source composition; Plot 2 assesses the fit to raw mixed-groundwater DO; Plot 3 shows a hypothetical river-only kinetic reference; Plot 4 isolates the river portion of fitted DO; and Plot 5 illustrates how both source components sum to the fitted total. None is independent validation of the reaction rate. Grouped held-out cross-validation (Section~\ref{sec:crossvalidation}) addresses predictive performance more directly. The common-MRT assumption for both recharge components remains a structural limitation.
 
-\textbf{Figure provenance.} Each displayed panel is linked to the PNG filename written by script 05 under \path{plots/final_39well/}: outputs 13, 14 and 16. Plot 3 (output 15) remains a script-generated diagnostic but is omitted from the main report. No phone-uploaded screenshots are embedded. The present PDF uses explicit missing-output notices wherever a local script-generated PNG is unavailable; regenerating the images in Positron and recompiling this \LaTeX{} file inserts the current figure outputs.
-
+\textbf{Figure provenance.} The five panels embed the current script-generated \texttt{01\_DO\_} through \texttt{05\_DO\_} PNGs, never phone-uploaded screenshots. GitHub does not include these gitignored local outputs; a compiled preview without them displays explicit missing-output notices. Regenerate the figures locally, then recompile this report.
 \clearpage
 \begin{landscape}
 \begin{figure}[H]
 \centering
 \fromPlotScript{\MRTplotOne}
-\caption{\textbf{Observed and model-fitted groundwater DO.} Open circles and crosses: measured mixed-sample DO (\site{2801} and \site{2130} are excluded from the DO likelihood; the script displays 2801's original 10.2\,mg/L observation). Coloured points: sample-specific posterior median fitted mixed-groundwater DO; colour represents the inferred LSR fraction. Vertical whiskers: 95\% in-sample posterior predictive intervals, including observation variability. This figure provides the direct sample-level fitted-versus-observed assessment, not a river-endmember comparison.}
-\label{fig:mixedmrt}
-\end{figure}
-\end{landscape}
+caption{\textbf{Plot 1: mixing-adjusted measured DO and the common first-order survival curve.} Points are measured DO divided by each well's posterior-inferred entry DO for its source mixture. Whiskers show 95\% credible intervals in this normalisation only. The dashed $\exp(-k_1t)$ curve and blue band use the common first-order rate estimated in the full joint model, not a separate regression through these model-conditioned points. The x-axis uses reported MRT, whereas the likelihood uses uncertain true MRT.}
+label{fig:adjustedmrt}
+end{figure}
+end{landscape}
+
 \clearpage
 \begin{landscape}
 \begin{figure}[H]
 \centering
 \fromPlotScript{\MRTplotTwo}
-\caption{\textbf{Measured mixed-groundwater DO versus the first-order river-only reference.} Coloured markers: observed groundwater DO concentrations and inferred LSR fraction. Dashed black curve and light-blue band: posterior median and 95\% credible interval for a hypothetical 100\%-river-derived groundwater component versus MRT. These are \emph{not} limits for the observed mixed samples: LSR inputs alter the sample DO, so many points can lie below the river-only trajectory without contradicting the fitted model. The script plots all retained original DO observations, including \site{2801} at 10.2\,mg/L, without a restrictive 10\,mg/L y-axis maximum.}
-\label{fig:samplemrt}
-\end{figure}
-\end{landscape}
+caption{\textbf{Plot 2: observed and fitted groundwater DO.} Open circles and crosses show observed mixed-sample DO, with crosses excluded from the DO likelihood at sites \site{2801} and \site{2130}. Coloured markers are the fitted mixed-DO posterior medians, coloured by inferred LSR fraction; the whiskers are 95\% posterior predictive intervals including observation residual variability.}
+label{fig:mixedmrt}
+end{figure}
+end{landscape}
+
+\clearpage
+\begin{landscape}
+\begin{figure}[H]
+\centering
+\fromPlotScript{\MRTplotThree}
+caption{\textbf{Plot 3: measured mixed DO versus the 100\%-river-only first-order reference.} Coloured markers are raw groundwater DO. The dashed curve and blue band show the model-derived pure-river trajectory and its 95\% credible interval, \emph{not} the expected mixed-sample DO or its prediction interval.}
+label{fig:samplemrt}
+end{figure}
+end{landscape}
+
 \clearpage
 \begin{landscape}
 \begin{figure}[H]
 \centering
 \fromPlotScript{\MRTplotFour}
-\caption{\textbf{Additive fitted river and LSR contributions to mixed-groundwater DO (script Plot 4).} Blue and red vertical segments are the posterior \emph{mean} river-derived and LSR-derived DO contributions, respectively, each in mg/L of the final mixed sample. Their stacked sum is the fitted total DO (black point). Open circles and crosses show measured DO included in or excluded from the likelihood, respectively. Grey whiskers are 95\% posterior \emph{credible intervals for the fitted mean DO}; unlike Figure~\ref{fig:mixedmrt}, they do not include observation-level posterior predictive dispersion. The source split is a model-based inference and is not an independent validation of the assumed common MRT.}
-\label{fig:componentsmrt}
-\end{figure}
-\end{landscape}
-\clearpage
+caption{\textbf{Plot 4: inferred river-attributable DO within mixed groundwater.} Markers and 95\% credible whiskers represent the joint-posterior river contribution, $(1-f_i)C_{R,i}$, where $C_{R,i}$ is the remaining river-endmember DO after aquifer reduction. The pure-river reference is unweighted: lower marker values follow from the inferred LSR fraction and are not independently measured river DO.}
+label{fig:riverfractionmrt}
+end{figure}
+end{landscape}
 
-The separate conceptual first-order source-decay illustration (Figure~\ref{fig:decay}) explains the reaction law but is \emph{not} one of the three displayed DO--MRT plots. Script Plot 3 remains available as an optional diagnostic and is not included here. The preferred-fit posterior summary from script 05 is likewise distinct; the previously noted $0.0632$ versus $0.0639\,\yr^{-1}$ rate-summary discrepancy still requires reconciliation with the saved draws before formal publication.
+\clearpage
+\begin{landscape}
+\begin{figure}[H]
+\centering
+\fromPlotScript{\MRTplotFive}
+caption{\textbf{Plot 5: fitted river and LSR DO contributions.} Blue and red stacked segments are posterior-mean contributions from river and LSR recharge, and their exact sum gives the black fitted-total point. Open circles and crosses are measured groundwater DO; grey whiskers give 95\% credible intervals for the fitted mean rather than full predictive intervals.}
+label{fig:componentsmrt}
+end{figure}
+end{landscape}
+
+\clearpage
+The separate conceptual first-order source-decay illustration (Figure~\ref{fig:decay}) is not one of these five script-generated DO--MRT figures. The previously reported $0.0632$ versus saved-fit $0.0639\,\yr^{-1}$ rate-summary discrepancy still needs reconciliation before formal publication.
 
 \subsection{Boundary sensitivity and posterior dependence}
 The first-order rate changes little between the fixed boundary and the initially reported uncertain-river fit (0.0625 versus $0.0632\,\yr^{-1}$); the later saved-fit baseline was $0.0639\,\yr^{-1}$. LSR water-table DO and deficit also remain similar at the posterior median. This is evidence of stability \emph{within the tested family of models}, not proof of independence from all river-water oxygen dynamics.
@@ -611,15 +643,15 @@ The final scripts are maintained in \repo. Following the Positron renumbering, t
 \item \path{scripts/03_river_DO_grouped_CV.R}: grouped held-out DO validation, with resumable fit cache.
 \item \path{scripts/01_DO_plotting.R}: summary and cross-validation plots, based on scripts 02 and 03 outputs.
 \item \path{scripts/04_DO_posterior_distributions.R}: one preferred first-order rate posterior density and posterior summary from the saved draws.
-\item \path{scripts/05_DO_kinetic_trajectories and summary.R}: four preferred-model DO--MRT figures (observed versus fitted; raw samples versus a river-only reference; river contribution; and an additive river/LSR decomposition), plus a four-parameter posterior summary. The main report displays only Plots 1, 2 and 4. Script 05 reads existing CmdStanR fit objects, writes PNGs under \path{plots/final_39well/} and does not run Stan.
+\item \path{scripts/05_DO_kinetic_trajectories and summary.R}: five numbered DO--MRT figures (mixing-adjusted first-order survival; observed versus fitted total DO; raw DO versus river-only reference; inferred river-attributable DO; and additive river/LSR components), plus a four-parameter posterior summary. All five appear in the report. Script 05 reads saved CmdStanR fits, writes PNGs under \path{plots/final_39well/}, and does not run Stan.
 \item \path{scripts/06_DO_LSR_MRT_sensitivity.R}: seven LSR/MRT sensitivity fits, with cache protection.
 \end{enumerate}
 The Stan model remains \path{stan/04_river_DO_prior_sensitivity.stan}. These were file and plotting-workflow changes, not changes to the fitted scientific model or previously validated posterior draws. Output directories intentionally retain historical names such as \path{outputs/04_river_DO_prior/} and \path{outputs/05_river_DO_grouped_CV/}, even though the runner scripts have been renumbered. Retired scripts are preserved in \texttt{archive/}. The root \path{scripts/tests.R} is an optional plotting scratch script, not a required analysis step.
 
-The saved fitted RDS objects, posterior CSVs, generated PNGs and private measurements reside only in the user's local working copy and are gitignored. \textbf{The displayed DO--MRT figures (script Plots 1, 2 and 4) are incorporated through script 05's output paths, not images from the phone uploads.} Figures~\ref{fig:workflow} and~\ref{fig:flowpath} are conceptual; Figures~\ref{fig:cvforest} and~\ref{fig:sensitivity} are based on reported tables; Figure~\ref{fig:decay} is an illustrative application of median parameters. The plotting script reads original well-level posterior draws saved locally, but those objects are not packaged with this report.
+The saved fitted RDS objects, posterior CSVs, generated PNGs and private measurements reside only in the user's local working copy and are gitignored. \textbf{All five DO--MRT figures are incorporated through script 05's output paths, not phone-uploaded images.} Figures~\ref{fig:workflow} and~\ref{fig:flowpath} are conceptual; Figures~\ref{fig:cvforest} and~\ref{fig:sensitivity} are based on reported tables; Figure~\ref{fig:decay} is an illustrative application of median parameters. The plotting script reads original well-level posterior draws saved locally, but those objects are not packaged with this report.
 
 \subsection*{Compiling the document}
-From the repository root, regenerate all four figures in Positron using:
+From the repository root, regenerate all five figures in Positron using:
 
 \begin{center}
 \small\texttt{source("scripts/05\_DO\_kinetic\_trajectories and summary.R")}
@@ -651,21 +683,21 @@ Additional sensitivity fits & Seven independent four-chain fits, varying recharg
 \end{tabularx}
 \end{table}
 
-\section{Script-generated DO--MRT figures and report selection}
+\section{Script-generated DO--MRT figures and exact filenames}
 \label{sec:appendixfigures}
-Active script 05 writes four PNG outputs into \path{plots/final_39well/}; the main report includes outputs \textbf{1, 2 and 4}, whose exact filenames are:
+Active script 05 writes five consecutively numbered PNG outputs into \path{plots/final_39well/}. All five are included in the main report:
 \begin{enumerate}[leftmargin=18pt,itemsep=2pt]
-\item \path{13_DO_observed_vs_fitted_mixed_2801_masked_no2130.png} (Figure~\ref{fig:mixedmrt});
-\item \path{14_DO_river_reference_raw_samples_2801_masked_no2130.png} (Figure~\ref{fig:samplemrt});
-\item \path{16_DO_fitted_components_2801_masked_no2130.png} (Figure~\ref{fig:componentsmrt}).
+\item \path{01_DO_mixing_adjusted_decay_2801_masked_no2130.png} (Figure~\ref{fig:adjustedmrt});
+\item \path{02_DO_observed_vs_fitted_mixed_2801_masked_no2130.png} (Figure~\ref{fig:mixedmrt});
+\item \path{03_DO_river_reference_raw_samples_2801_masked_no2130.png} (Figure~\ref{fig:samplemrt});
+\item \path{04_DO_river_contribution_2801_masked_no2130.png} (Figure~\ref{fig:riverfractionmrt});
+\item \path{05_DO_fitted_components_2801_masked_no2130.png} (Figure~\ref{fig:componentsmrt}).
 \end{enumerate}
-The original Plot 3, \path{15_DO_river_contribution_2801_masked_no2130.png}, is still written by script 05 but excluded from the main text. The four-parameter posterior summary is written separately as \path{17_DO_primary_posterior_summary_2801_masked_no2130.md}. All files are generated locally and not committed to Git. The source intentionally omits generated PNGs; if they are missing, the PDF explicitly identifies the unavailable output instead of embedding a stale screenshot.
-
-The additive Plot 4 uses posterior means for the source-contribution segment heights and fitted total, whereas Plot 1 uses fitted posterior medians. Plot 4's 95\% credible whiskers summarise uncertainty in the fitted \emph{mean}; Plot 1's 95\% posterior predictive whiskers also include observation-scale residual variability. The conceptual two-endmember source-decay illustration is Figure~\ref{fig:decay}; the preferred-rate posterior density from script 04 is an optional separate output.
+The four-parameter posterior summary is written separately as \path{06_DO_primary_posterior_summary_2801_masked_no2130.md}. All figure files and saved model fits are kept locally (gitignored), and the report uses no uploaded screenshot substitutes. Plot 1's normalised observed values are conditional on the joint mixing fit, so its credible whiskers are not an independent measurement of kinetic survival. Plot 2 uses posterior predictive whiskers; Plot 4 displays inferred fractional river contribution relative to an unweighted pure-river reference; and Plot 5 uses additive posterior mean contributions with credible intervals for fitted mean DO. The conceptual two-source decay graphic remains separate as Figure~\ref{fig:decay}.
 
 \section{Provenance and editorial checklist}
-The numerical posterior estimates, model settings, correlations, paired CV comparisons and seven-fit sensitivity results are drawn from user-reported November 2026 outputs and reviewed repository code. Stan was not rerun for this report. The earlier $0.0632$ versus saved-fit $0.0639\,\yr^{-1}$ rate-summary discrepancy remains flagged pending reconciliation. Script 05 has now been extended to generate an additional, additive river/LSR decomposition as Plot 4; the original Plots 1, 2 and 3 remain in the script unchanged. The report deliberately displays 1, 2 and 4. The plotting change does not alter Stan, the calibrated likelihood, existing posterior fits, or the grouped CV. The report source references the exact script-generated PNG paths and must be recompiled after local plot generation.
+The numerical posterior estimates, model settings, correlations, paired CV comparisons and seven-fit sensitivity results are drawn from user-reported November 2026 outputs and reviewed repository code. Stan was not rerun for this report. The earlier $0.0632$ versus saved-fit $0.0639\,\yr^{-1}$ rate-summary discrepancy remains flagged pending reconciliation. Script 05 now generates five consecutively numbered figures and this report includes all five. The plotting changes do not alter Stan, the fitted likelihood, posterior fits or grouped CV. The report source uses the exact script-generated PNG paths and must be recompiled after local plot generation.
 
-Before manuscript submission, regenerate the four figure outputs locally, check that the three selected images are correctly embedded, reconcile preferred-model posterior summaries between RDS and the older CSV, supply relevant maps and absolute held-out CV scores, and add literature references. Source contributions and their credible intervals are inferred within the fitted model; they are not independent measurements of pure-source water.
+Before manuscript submission, regenerate all five figure outputs locally, check the five panels and their captions, reconcile the posterior summaries between RDS and the older CSV, supply relevant maps and absolute CV scores, and add literature references. Source contributions and mixing-adjusted observations remain model-conditioned rather than independent validation of the shared effective MRT assumption.
 
 \end{document}
