@@ -6,7 +6,7 @@ root="$(cd -- "$here/.." && pwd)"
 figures=(
   "13_DO_observed_vs_fitted_mixed_2801_masked_no2130.png"
   "14_DO_river_reference_raw_samples_2801_masked_no2130.png"
-  "15_DO_river_contribution_2801_masked_no2130.png"
+  "16_DO_fitted_components_2801_masked_no2130.png"
 )
 for name in "${figures[@]}"; do
   file="$root/plots/final_39well/$name"
@@ -20,4 +20,4 @@ command -v pdflatex >/dev/null || { echo "pdflatex is required for this report" 
 cd "$here"
 pdflatex -interaction=nonstopmode -halt-on-error heretaunga_do_model_report.tex
 pdflatex -interaction=nonstopmode -halt-on-error heretaunga_do_model_report.tex
-printf 'Created %s/heretaunga_do_model_report.pdf with all three script-generated plots.\n' "$here"
+printf 'Created %s/heretaunga_do_model_report.pdf with script-generated Plots 1, 2 and 4.\n' "$here"
