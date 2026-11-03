@@ -1,5 +1,12 @@
 # Heretaunga Plains — final two-source Bayesian groundwater DO model
 
+## Technical report (LaTeX and PDF)
+
+The full report source is tracked at [`docs/heretaunga_do_model_report.tex`](docs/heretaunga_do_model_report.tex), with the [local build script](docs/build_heretaunga_report.sh) and [instructions](docs/README_report.md). Run `scripts/05_DO_kinetic_trajectories and summary.R` and then `bash docs/build_heretaunga_report.sh` to regenerate the PDF from the three current DO–MRT plot PNGs in `plots/final_39well/`. No model refitting is needed.
+
+A [compiled PDF preview](docs/heretaunga_do_model_report.pdf) is maintained through a GitHub Action. Because `plots/` and `outputs/` are intentionally gitignored and absent from GitHub, the preview has explicit missing-plot notices. **The locally rebuilt PDF is the complete version with the actual model-generated figures.** The LaTeX never references the screenshot uploads.
+
+
 **Current analysis: 39 DO observations**, excluding sites 2801 and 2130 from the dissolved-oxygen likelihood, but retaining their δ¹⁸O and chloride measurements. Site 16758 is excluded from all analysis. The original DO measurements are not altered in the private input CSV.
 
 ## Run this final workflow in Positron
