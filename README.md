@@ -9,24 +9,25 @@ Open the repository as your R working directory and ensure the private input fil
 | Active script | What it does | MCMC? |
 |---|---|---|
 | [`00_setup.R`](scripts/00_setup.R) | Load/check private data; prepare tracer, age and DO inputs | **No** |
-| [`04_river_DO_prior_sensitivity.R`](scripts/04_river_DO_prior_sensitivity.R) | Full-data posterior fits: fixed/broad river DO × zero-/first-order aquifer kinetics | **Yes — 4 fits** |
-| [`05_river_DO_grouped_CV.R`](scripts/05_river_DO_grouped_CV.R) | Matched 5-fold held-out DO comparison, with diagnostics and paired group bootstrap; reuses saved fold fits | **Yes — only if necessary** |
-| [`02_DO_plotting.R`](scripts/02_DO_plotting.R) | Figures for final 04 parameter summaries and 05 CV (no old 01 results required) | **No** |
-| [`06_DO_posterior_distributions.R`](scripts/06_DO_posterior_distributions.R) | **One** preferred-model first-order rate posterior plot; verifies posterior summaries directly from the saved fit | **No** |
-| [`07_DO_LSR_MRT_sensitivity.R`](scripts/07_DO_LSR_MRT_sensitivity.R) | One-at-a-time robustness check: recharge temperature, LSR-survival prior and MRT uncertainty; reuses saved broad-prior first-order baseline | **Yes — 7 additional fits, cached** |
+| [`04_river_DO_prior_sensitivity.R`](scripts/02_river_DO_prior_sensitivity.R) | Full-data posterior fits: fixed/broad river DO × zero-/first-order aquifer kinetics | **Yes — 4 fits** |
+| [`05_river_DO_grouped_CV.R`](scripts/03_river_DO_grouped_CV.R) | Matched 5-fold held-out DO comparison, with diagnostics and paired group bootstrap; reuses saved fold fits | **Yes — only if necessary** |
+| [`02_DO_plotting.R`](scripts/01_DO_plotting.R) | Figures for final 04 parameter summaries and 05 CV (no old 01 results required) | **No** |
+| [`06_DO_posterior_distributions.R`](scripts/04_DO_posterior_distributions.R) | **One** preferred-model first-order rate posterior plot; verifies posterior summaries directly from the saved fit | **No** |
+| [`07_DO_LSR_MRT_sensitivity.R`](scripts/06_DO_LSR_MRT_sensitivity.R) | One-at-a-time robustness check: recharge temperature, LSR-survival prior and MRT uncertainty; reuses saved broad-prior first-order baseline | **Yes — 7 additional fits, cached** |
 
 Recommended sequence **for a new run** (each `source()` is a separate Positron R-console command):
 
 ```r
 source("scripts/00_setup.R")                        # optional check, no MCMC
-source("scripts/04_river_DO_prior_sensitivity.R")    # fit four full-data models
-source("scripts/05_river_DO_grouped_CV.R")           # CV; reuses valid cached fits
-source("scripts/02_DO_plotting.R")                   # plots only
-source("scripts/06_DO_posterior_distributions.R")   # one preferred-rate posterior figure
-source("scripts/07_DO_LSR_MRT_sensitivity.R")        # robustness fits; cached if complete
+source("scripts/02_river_DO_prior_sensitivity.R")    # fit four full-data models
+source("scripts/03_river_DO_grouped_CV.R")           # CV; reuses valid cached fits
+source("scripts/01_DO_plotting.R")                   # plots only
+source("scripts/04_DO_posterior_distributions.R")   # one preferred-rate posterior figure
+source("scripts/05_DO_kinetic_trajectories and summary.R") # two DO-MRT figures
+source("scripts/06_DO_LSR_MRT_sensitivity.R")        # robustness fits; cached if complete
 ```
 
-**If the saved 04 and 05 fits and reports already exist, run only scripts 02 and 06 for normal plotting.** Script 07 is a *separate sensitivity study*: the user has completed all seven new fits and reported passing diagnostics. It tests scientific assumptions, not whether the original chains were long enough. Do not rerun 04 or 05. All four original full-data fits passed diagnostics; posterior bulk/tail ESS for key first-order parameters exceeded 3,000.
+**If the saved 04 and 05 fits and reports already exist, run only scripts 01, 04, and 05 for plotting.** Script 06 is a *separate sensitivity study*: the user has completed all seven new fits and reported passing diagnostics. It tests scientific assumptions, not whether the original chains were long enough. Do not rerun 04 or 05. All four original full-data fits passed diagnostics; posterior bulk/tail ESS for key first-order parameters exceeded 3,000.
 
 ### Model configuration and scientific findings
 
@@ -43,8 +44,9 @@ source("scripts/07_DO_LSR_MRT_sensitivity.R")        # robustness fits; cached i
 - Full posterior fits/diagnostics: `outputs/04_river_DO_prior/2801_masked_no2130/`.
 - Grouped CV results/bootstrap: `outputs/05_river_DO_grouped_CV/2801_masked_no2130/`.
 - CV and parameter-summary plots: `plots/final_39well/`.
+- **Two DO–MRT figures** and four-parameter posterior summary: `plots/final_39well/`. The fitted mixed-groundwater plot uses `mean_DO` and 95% in-sample intervals from `replicated_DO`. The river-contribution plot uses **joint** `(1-f_LSR)*river_DO_after_aquifer` draws; the river-only reference is not the expected mixed-sample DO.
 - **One preferred-rate posterior plot** and posterior-draw summary CSV: `plots/04_river_DO_prior/2801_masked_no2130/posterior_distributions/`. The previous seven-figure plotter is preserved in `archive/scripts/06_DO_posterior_distributions_legacy.R` (not in the active workflow).
-- Script 07 sensitivity summaries and fits: `outputs/07_DO_LSR_MRT_sensitivity/2801_masked_no2130/`; figures: `plots/07_DO_LSR_MRT_sensitivity/2801_masked_no2130/`.
+- Script 06 sensitivity summaries and fits: `outputs/07_DO_LSR_MRT_sensitivity/2801_masked_no2130/`; figures: `plots/07_DO_LSR_MRT_sensitivity/2801_masked_no2130/`.
 
 `outputs/`, `plots/` and private `data/*.csv` are gitignored. **GitHub does not contain the user's private measurements or local saved MCMC fits.** The cleanup does not delete or modify these directories locally.
 
@@ -62,4 +64,4 @@ All fitted models assign **the same well-specific effective aquifer MRT** to the
 
 ### Repository audit, November 2026
 
-The active working scripts are intentionally limited to **00, 02, 04, 05, 06, 07**; historical development code is in `archive/`. Scripts 04/05 and the Stan model are left untouched except for explanatory comments: altering model inputs, setup, or Stan would invalidate the existing script-05 CV fit design checksum. Script 06 is a lightweight **one-figure** plotter; its seven-figure predecessor is archived. Plots and fit data are local-only; the numerical values recorded here come from the user's reported results, not a re-execution of Stan on GitHub.
+The active working analysis scripts are **00–06** after the user's renumbering, plus a separate `scripts/tests.R` scratch plotting file; historical development code is in `archive/`. Scripts 02/03 and the Stan model are left untouched except for explanatory comments: altering model inputs, setup, or Stan would invalidate the existing script-05 CV fit design checksum. Script 04 is a lightweight **one-figure** posterior plotter; its seven-figure predecessor is archived. Plots and fit data are local-only; the numerical values recorded here come from the user's reported results, not a re-execution of Stan on GitHub.
