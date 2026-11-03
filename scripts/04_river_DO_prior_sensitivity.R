@@ -5,8 +5,9 @@
 # mixing model and competing zero-/first-order aquifer DO kinetics.
 #
 # DEFAULT: two scenarios * two kinetic orders = four independent Stan fits.
-#   A fixed:      river DO = 7.5 mg/L — preferred regional primary model
+#   A fixed:      river DO = 7.5 mg/L — predictive comparator
 #   C prior_sd1p5:river DO ~ Normal(7.5,1.5^2) truncated [0,14.65]
+#                 — selected physical primary with first-order kinetics
 # Optional B prior_sd1 can be restored in cfg04$scenarios if needed.
 #
 # Site 2801: measured groundwater DO=10.2 mg/L, MRT assumed zero.
