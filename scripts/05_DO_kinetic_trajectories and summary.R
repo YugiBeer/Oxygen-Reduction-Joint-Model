@@ -1,361 +1,283 @@
-# 05_DO_kinetic_trajectories and summary.R — observed DO and river reference trajectories
+# 05_DO_kinetic_trajectories and summary.R
 #
-# Plot-only companion to scripts/01_DO_plotting.R. It loads the saved
-# script-04 CmdStanR fits and shows observed groundwater DO against reported
-# MRT, posterior river endmember reference trajectories, and posterior median
-# LSR fraction as the point colour.
-# The reference uses the jointly fitted shared aquifer rate and assumed
-# effective aquifer age. An LSR trajectory is omitted because its travel time
-# and independent loss rate are not determined by this model.
-# Prints a four-parameter preferred-model summary at the end and saves one
-# Markdown table alongside the figures, using the same saved posterior.
+# TWO complementary DO vs MRT plots for the preferred model:
+#  1. Observed mixed-groundwater DO against its sample-specific fitted DO
+#     (mean_DO), with 95% posterior predictive intervals (replicated_DO).
+#  2. Sample-specific DO attributable to river recharge,
+#     (1 - f_LSR) * river_DO_after_aquifer, alongside the posterior
+#     100%-river reference trajectory.
+#
+# The river-only trajectory is NOT the fitted mean of the mixed samples.
+# No Stan sampling or modification of fitted objects occurs.
+#
+# Preferred model: 39 fitted DO observations, river DO
+#   ~ Normal(7.5, 1.5^2) truncated [0, 14.65] mg/L;
+# first-order aquifer DO kinetics; 2801 and 2130 DO excluded from
+# the likelihood but their delta18O and chloride retained.
 #
 # Run from the repository root:
 #   source("scripts/05_DO_kinetic_trajectories and summary.R")
 
-# 1. Load inputs and calculate the plotting data and summary table.
-# Plotting starts at section 2, after all calculations are complete.
 if (!file.exists("scripts/00_setup.R"))
-  stop("Set the working directory to the repository root.")
-source("scripts/00_setup.R",local=TRUE)
+  stop("Set working directory to the repository root.")
+source("scripts/00_setup.R", local=TRUE)
 
-required07 <- c("ggplot2","dplyr","tibble","posterior","viridisLite")
-missing07 <- required07[
-  !vapply(required07,requireNamespace,logical(1),quietly=TRUE)
+packages05 <- c("ggplot2","posterior","viridisLite")
+not_found05 <- packages05[
+  !vapply(packages05,requireNamespace,logical(1),quietly=TRUE)
 ]
-if (length(missing07))
-  stop("Install R package(s): ",paste(missing07,collapse=", "))
+if (length(not_found05))
+  stop("Install R package(s): ",paste(not_found05,collapse=", "))
 
-suite07 <- "2801_masked_no2130"
-scenario07 <- c("A_fixed_7p5","C_prior_sd1p5")
-input07 <- file.path("outputs","04_river_DO_prior",suite07)
-plotdir07 <- file.path("plots","final_39well")
-dir.create(plotdir07,recursive=TRUE,showWarnings=FALSE)
+# ---- Configuration -----------------------------------------------------
+suite05 <- "2801_masked_no2130"
+scenario05 <- "C_prior_sd1p5"
+order05 <- 1L
+fit_dir05 <- file.path("outputs","04_river_DO_prior",suite05)
+fit_path05 <- file.path(fit_dir05,
+  paste0("fit_",scenario05,"_order",order05,".rds"))
+status_path05 <- file.path(fit_dir05,"fit_status.csv")
+plot_dir05 <- file.path("plots","final_39well")
+dir.create(plot_dir05,recursive=TRUE,showWarnings=FALSE)
+turbo05 <- viridisLite::turbo(256)
+river_blue05 <- turbo05[32L]
 
-fit_files07 <- expand.grid(
-  scenario=scenario07,aquifer_order=0:1,
+if (!all(file.exists(c(fit_path05,status_path05))))
+  stop("Preferred saved fit or fit_status.csv missing in ",fit_dir05,
+       ". Run the full-data fitting script only if outputs are absent.")
+
+fit_status05 <- utils::read.csv(status_path05,stringsAsFactors=FALSE)
+needed05 <- c("scenario","aquifer_order","all_diagnostics_pass")
+if (!all(needed05 %in% names(fit_status05)))
+  stop("fit_status.csv missing required fields.")
+passed05 <- fit_status05$all_diagnostics_pass[
+  fit_status05$scenario==scenario05 &
+    fit_status05$aquifer_order==order05
+]
+if (length(passed05)!=1L || !isTRUE(passed05))
+  stop("Preferred model diagnostics are absent or failed; do not plot it.")
+
+# ---- Obtain well-level fitted quantities from the same posterior ------
+stopifnot(nrow(d)==41L)
+N05 <- nrow(d)
+idx05 <- seq_len(N05)
+key05 <- c("river_DO","aquifer_rate_actual",
+           "LSR_DO_at_water_table","LSR_DO_deficit")
+v05 <- function(name) paste0(name,"[",idx05,"]")
+vars05 <- c(key05, "k_ref",
+            v05("f_LSR"),v05("mean_DO"),
+            v05("replicated_DO"),v05("river_DO_after_aquifer"))
+
+fit05 <- readRDS(fit_path05)
+z05 <- posterior::as_draws_matrix(fit05$draws(variables=vars05))
+if (!all(vars05 %in% colnames(z05)))
+  stop("Saved model does not contain the expected well-level draws.")
+if (any(!is.finite(z05[,vars05,drop=FALSE])))
+  stop("Saved posterior contains non-finite draws.")
+
+mat05 <- function(name) z05[,v05(name),drop=FALSE]
+f05 <- mat05("f_LSR")
+mu05 <- mat05("mean_DO")
+rep05 <- mat05("replicated_DO")
+river05 <- mat05("river_DO_after_aquifer")
+river_contrib05 <- (1-f05)*river05   # mg/L contributed to each MIXED sample
+
+qcol05 <- function(mat,p) apply(mat,2,stats::quantile,probs=p)
+
+wells05 <- data.frame(
+  Site_ID=d$Site_ID,
+  MRT=d$MRT,
+  DO_observed=d$DO_original,
+  excluded_DO=d$Site_ID %in% c(cfg$river_proxy_site,"2130"),
+  f_LSR=apply(f05,2,stats::median),
+  DO_fitted=apply(mu05,2,stats::median),
+  DO_pred_lower95=qcol05(rep05,0.025),
+  DO_pred_upper95=qcol05(rep05,0.975),
+  river_contrib=apply(river_contrib05,2,stats::median),
+  river_contrib_lower95=qcol05(river_contrib05,0.025),
+  river_contrib_upper95=qcol05(river_contrib05,0.975),
   stringsAsFactors=FALSE
 )
-fit_files07$filename <- file.path(
-  input07,
-  paste0("fit_",fit_files07$scenario,
-         "_order",fit_files07$aquifer_order,".rds")
-)
-if (any(!file.exists(fit_files07$filename)))
-  stop("Missing saved fit object(s):\n",
-       paste(fit_files07$filename[!file.exists(fit_files07$filename)],
-             collapse="\n"),
-       "\nRun scripts/02_river_DO_prior_sensitivity.R first.")
+if (sum(!wells05$excluded_DO)!=39L ||
+    anyNA(wells05$DO_fitted))
+  stop("Unexpected sample mask or missing predictions.")
 
-status07_path <- file.path(input07,"fit_status.csv")
-if (!file.exists(status07_path))
-  stop("Missing ",status07_path,"; cannot check sampler diagnostics.")
-status07 <- readr::read_csv(status07_path,show_col_types=FALSE)
-if (!all(c("scenario","aquifer_order","all_diagnostics_pass") %in%
-         names(status07)))
-  stop("Unexpected format in ",status07_path)
-if (any(!status07$all_diagnostics_pass))
-  warning("At least one saved fit failed sampler diagnostics; the plotted ",
-          "posterior bands are provisional.")
-
-turbo07 <- viridisLite::turbo(256L)
-order_labels07 <- c(`0`="Zero-order aquifer",`1`="First-order aquifer")
-scenario_labels07 <- c(
-  A_fixed_7p5="River DO fixed at 7.5 mg/L",
-  C_prior_sd1p5="River DO prior SD = 1.5 mg/L"
+# ---- Posterior river-only reference curve -----------------------------
+# The curve uses the plotted (reported) MRT as a fixed horizontal value.
+# Sample-specific contributions above use the model's latent true_MRT.
+mrt_grid05 <- seq(0,max(d$MRT,na.rm=TRUE)*1.05,length.out=251L)
+start05 <- z05[,"river_DO"]
+rate05 <- z05[,"k_ref"]
+river_curve05 <- t(vapply(
+  mrt_grid05,
+  function(t) start05*exp(-rate05*t),
+  numeric(nrow(z05))
+))
+curve05 <- data.frame(
+  MRT=mrt_grid05,
+  median=apply(river_curve05,2,stats::median),
+  lower95=qcol05(river_curve05,0.025),
+  upper95=qcol05(river_curve05,0.975)
 )
 
-dat07 <- dplyr::filter(d,is.finite(DO_original),is.finite(MRT)) %>%
-  dplyr::mutate(
-    excluded_DO=Site_ID %in% c(cfg$river_proxy_site,"2130"),
-    label_hjust=ifelse(MRT==0,-.1,.5)
+# ---- Shared appearance -------------------------------------------------
+gradient05 <- ggplot2::scale_colour_gradientn(
+  colours=turbo05[32:230],limits=c(0,1),
+  name="LSR fraction",
+  breaks=c(0,.25,.5,.75,1),
+  labels=c("0%","25%","50%","75%","100%")
+)
+theme05 <- ggplot2::theme_bw(base_size=13) +
+  ggplot2::theme(
+    panel.grid.minor=ggplot2::element_blank(),
+    plot.title=ggplot2::element_text(face="bold"),
+    legend.position="right",
+    legend.box="vertical"
   )
-
-draw_matrix07 <- function(fit,variables) {
-  posterior::as_draws_matrix(fit$draws(variables=variables))
-}
-quantile_curve07 <- function(x,river) {
-  tibble::tibble(
-    MRT=x,
-    median=stats::median(river),
-    lower95=stats::quantile(river,.025),
-    upper95=stats::quantile(river,.975)
-  )
+save05 <- function(plot,file,width=10,height=7) {
+  path <- file.path(plot_dir05,file)
+  print(plot)
+  ggplot2::ggsave(path,plot=plot,width=width,height=height,
+                  dpi=300,units="in",bg="white")
+  message("PLOT: ",normalizePath(path))
 }
 
-all_points07 <- list()
-all_curves07 <- list()
-for (i in seq_len(nrow(fit_files07))) {
-  fit <- readRDS(fit_files07$filename[i])
-  order07 <- fit_files07$aquifer_order[i]
-  scenario07_i <- fit_files07$scenario[i]
-  n07 <- nrow(dat07)
-  fvars07 <- paste0("f_LSR[",seq_len(n07),"]")
-  vars07 <- c("river_DO","k_ref",fvars07)
-  z07 <- draw_matrix07(fit,vars07)
+excluded05 <- wells05[wells05$excluded_DO,,drop=FALSE]
 
-  fmat07 <- z07[,fvars07,drop=FALSE]
-  points07 <- dat07 %>%
-    dplyr::mutate(
-      scenario=scenario07_i,
-      aquifer_order=order07,
-      lsr_fraction=apply(fmat07,2,stats::median)
+# 1. Goodness-of-fit: compare OBSERVED mixed DO with fitted MIXED DO.
+# 95% ranges are POSTERIOR PREDICTIVE for a sample observation,
+# not just uncertainty on the conditional mean or a river reference.
+p_fit05 <- ggplot2::ggplot(wells05,ggplot2::aes(x=MRT)) +
+  ggplot2::geom_segment(
+    ggplot2::aes(xend=MRT,y=DO_observed,yend=DO_fitted),
+    colour="grey70",linewidth=.55
+  ) +
+  ggplot2::geom_linerange(
+    ggplot2::aes(ymin=DO_pred_lower95,
+                 ymax=DO_pred_upper95,colour=f_LSR),
+    linewidth=.8,alpha=.60
+  ) +
+  ggplot2::geom_point(
+    ggplot2::aes(y=DO_observed,shape=excluded_DO),
+    colour="grey15",size=3,stroke=.85
+  ) +
+  ggplot2::geom_point(
+    ggplot2::aes(y=DO_fitted,colour=f_LSR),
+    size=2.5,alpha=.95
+  ) +
+  ggplot2::geom_text(
+    data=excluded05,
+    ggplot2::aes(y=DO_observed,label=Site_ID),
+    colour="grey20",vjust=-.9,size=3.4,show.legend=FALSE
+  ) +
+  gradient05 +
+  ggplot2::scale_shape_manual(
+    values=c("FALSE"=1,"TRUE"=4),
+    labels=c("FALSE"="DO used in fit","TRUE"="DO excluded from fit"),
+    name="Observed DO"
+  ) +
+  ggplot2::scale_y_continuous(
+    expand=ggplot2::expansion(mult=c(.03,.06))
+  ) +
+  ggplot2::labs(
+    title="Observed and model-fitted groundwater DO",
+    subtitle="Open circles / crosses: measured DO; coloured points: fitted mixed-groundwater DO",
+    x="Reported groundwater MRT (years)",
+    y="Dissolved oxygen (mg/L)",
+    caption="Vertical ranges: 95% in-sample posterior predictive intervals; 2801 and 2130 DO excluded from fitting."
+  ) + theme05
+save05(p_fit05,
+       paste0("13_DO_observed_vs_fitted_mixed_",suite05,".png"),
+       width=11,height=7.5)
+
+# 2. River-derived contribution to each mixed groundwater sample.
+# Posterior contributions use JOINT draws of source fraction and river
+# concentration AFTER aquifer reaction, not products of separate medians.
+# The dashed line is the 100%-river REFERENCE, never the expected mixed DO.
+p_river05 <- ggplot2::ggplot() +
+  ggplot2::geom_ribbon(
+    data=curve05,
+    ggplot2::aes(x=MRT,ymin=lower95,ymax=upper95),
+    fill=river_blue05,alpha=.16
+  ) +
+  ggplot2::geom_line(
+    data=curve05,
+    ggplot2::aes(x=MRT,y=median),
+    colour="grey20",linewidth=.9,linetype="longdash"
+  ) +
+  ggplot2::geom_linerange(
+    data=wells05,
+    ggplot2::aes(x=MRT,ymin=river_contrib_lower95,
+                 ymax=river_contrib_upper95,colour=f_LSR),
+    alpha=.70,linewidth=.8
+  ) +
+  ggplot2::geom_point(
+    data=wells05,
+    ggplot2::aes(x=MRT,y=river_contrib,colour=f_LSR),
+    size=2.8,alpha=.95
+  ) +
+  ggplot2::geom_text(
+    data=excluded05,
+    ggplot2::aes(x=MRT,y=river_contrib,label=Site_ID),
+    colour="grey20",vjust=-.9,size=3.4,show.legend=FALSE
+  ) +
+  gradient05 +
+  ggplot2::scale_y_continuous(
+    limits=c(0,NA),
+    expand=ggplot2::expansion(mult=c(0,.05))
+  ) +
+  ggplot2::labs(
+    title="River-derived DO contribution in each groundwater sample",
+    subtitle="Dashed curve: 100% river-recharge reference; points: modelled river contribution after mixing",
+    x="Reported groundwater MRT (years)",
+    y="River-attributable DO in the mixed sample (mg/L)",
+    caption="Sample points = (1 - f_LSR) x river DO after aquifer reaction; vertical ranges and reference band are 95% posterior credible intervals."
+  ) + theme05
+save05(p_river05,
+       paste0("14_DO_river_contribution_",suite05,".png"),
+       width=11,height=7.5)
+
+# ---- Four-parameter summary from the SAME preferred posterior --------
+labels05 <- c("River-entry DO","First-order aquifer rate",
+              "LSR DO at water table","LSR DO deficit")
+units05 <- c("mg/L","yr\u207b\u00b9","mg/L","mg/L")
+digits05 <- c(2L,4L,2L,2L)
+summary05 <- data.frame(
+  parameter=labels05,variable=key05,
+  median=vapply(key05,function(v) stats::median(z05[,v]),numeric(1)),
+  lower95=vapply(key05,function(v)
+    unname(stats::quantile(z05[,v],.025)),numeric(1)),
+  upper95=vapply(key05,function(v)
+    unname(stats::quantile(z05[,v],.975)),numeric(1))
+)
+fmt05 <- function(x) paste0(
+  "| ",paste(x,collapse=" | ")," |"
+)
+summary_table05 <- c(
+  "| Parameter | Posterior median | 95% credible interval |",
+  "|---|---:|---:|",
+  vapply(seq_along(key05),function(i) fmt05(c(
+    labels05[i],
+    paste(sprintf("%.*f",digits05[i],summary05$median[i]),units05[i]),
+    paste0(
+      sprintf("%.*f",digits05[i],summary05$lower95[i]),"\u2013",
+      sprintf("%.*f",digits05[i],summary05$upper95[i])
     )
-  all_points07[[length(all_points07)+1L]] <- points07
-
-  grid07 <- seq(0,max(dat07$MRT,na.rm=TRUE)*1.05,length.out=250L)
-  river07 <- vector("list",length(grid07))
-  for (j in seq_along(grid07)) {
-    t07 <- grid07[j]
-    if (order07==0L) {
-      river07[[j]] <- pmax(0,z07[,"river_DO"]-
-        z07[,"k_ref"]*cfg$C_ref*t07)
-    } else {
-      river07[[j]] <- z07[,"river_DO"]*exp(-z07[,"k_ref"]*t07)
-    }
-  }
-  curves07 <- dplyr::bind_rows(lapply(seq_along(grid07),function(j)
-    quantile_curve07(grid07[j],river07[[j]])
-  )) %>%
-    dplyr::mutate(scenario=scenario07_i,aquifer_order=order07)
-  all_curves07[[length(all_curves07)+1L]] <- curves07
-}
-
-points07 <- dplyr::bind_rows(all_points07) %>%
-  dplyr::mutate(
-    order_label=factor(aquifer_order,levels=0:1,
-                       labels=unname(order_labels07)),
-    scenario_label=factor(scenario,levels=scenario07,
-                          labels=unname(scenario_labels07))
-  )
-curves07 <- dplyr::bind_rows(all_curves07) %>%
-  dplyr::mutate(
-    order_label=factor(aquifer_order,levels=0:1,
-                       labels=unname(order_labels07)),
-    scenario_label=factor(scenario,levels=scenario07,
-                          labels=unname(scenario_labels07))
-  )
-
-# Prepare the preferred-model data and site labels before plotting.
-curves07_variable <- dplyr::filter(
-  curves07,aquifer_order==1,scenario=="C_prior_sd1p5"
+  )),character(1))
 )
-points07_variable <- dplyr::filter(
-  points07,aquifer_order==1,scenario=="C_prior_sd1p5"
+summary_path05 <- file.path(
+  plot_dir05,paste0("15_DO_primary_posterior_summary_",suite05,".md")
 )
-labels07 <- dplyr::filter(points07,excluded_DO)
-labels07_variable <- dplyr::filter(points07_variable,excluded_DO)
-
-# Calculate the reporting table from the same preferred-model posterior.
-summary_fit_file07 <- fit_files07$filename[
-  fit_files07$scenario=="C_prior_sd1p5" &
-    fit_files07$aquifer_order==1L
-]
-summary_variables07 <- c(
-  "river_DO","aquifer_rate_actual",
-  "LSR_DO_at_water_table","LSR_DO_deficit"
-)
-summary_draws07 <- draw_matrix07(
-  readRDS(summary_fit_file07),summary_variables07
-)
-if (!all(summary_variables07 %in% colnames(summary_draws07)) ||
-    any(!is.finite(summary_draws07[,summary_variables07,drop=FALSE])))
-  stop("Preferred-model summary requires finite draws for all four parameters.")
-
-summary07 <- data.frame(
-  parameter=c("River-entry DO","First-order aquifer rate",
-              "LSR DO at water table","LSR DO deficit"),
-  variable=summary_variables07,
-  unit=c("mg/L","yr\u207b\u00b9","mg/L","mg/L"),
-  digits=c(2L,4L,2L,2L),
-  median=vapply(summary_variables07,function(v)
-    stats::median(summary_draws07[,v]),numeric(1)),
-  lower95=vapply(summary_variables07,function(v)
-    unname(stats::quantile(summary_draws07[,v],.025)),numeric(1)),
-  upper95=vapply(summary_variables07,function(v)
-    unname(stats::quantile(summary_draws07[,v],.975)),numeric(1)),
-  row.names=NULL
-)
-summary_table07 <- data.frame(
-  Parameter=summary07$parameter,
-  `Posterior median`=paste(
-    sprintf("%.*f",summary07$digits,summary07$median),summary07$unit
-  ),
-  `95% credible interval`=paste0(
-    sprintf("%.*f",summary07$digits,summary07$lower95),"\u2013",
-    sprintf("%.*f",summary07$digits,summary07$upper95)
-  ),
-  check.names=FALSE
-)
-
-# 2. Plot the four-model comparison.
-# All appearance settings are directly in this ggplot block.
-p07 <- ggplot2::ggplot() +
-  ggplot2::geom_ribbon(
-    data=curves07,
-    ggplot2::aes(x=MRT,ymin=lower95,ymax=upper95),
-    fill=turbo07[32L],alpha=.16
-  ) +
-  ggplot2::geom_line(
-    data=curves07,
-    ggplot2::aes(x=MRT,y=median),
-    colour="grey15",linewidth=.8,linetype="longdash"
-  ) +
-  ggplot2::geom_point(
-    data=points07,
-    ggplot2::aes(x=MRT,y=DO_original,colour=lsr_fraction,shape=excluded_DO),
-    size=2.8,alpha=.85
-  ) +
-  ggplot2::geom_text(
-    data=labels07,
-    ggplot2::aes(x=MRT,y=DO_original,label=Site_ID,hjust=label_hjust),
-    colour="grey20",vjust=-.9,size=3.2,show.legend=FALSE
-  ) +
-  ggplot2::facet_grid(order_label~scenario_label) +
-  ggplot2::scale_colour_gradientn(
-    colours=turbo07[32:230],limits=c(0,1),name="LSR fraction",
-    breaks=c(0,.25,.5,.75,1),labels=c("0%","25%","50%","75%","100%")
-  ) +
-  ggplot2::scale_shape_manual(
-    values=c(`FALSE`=16,`TRUE`=1),name=NULL,
-    labels=c(`FALSE`="DO used in fit",`TRUE`="DO excluded from fit")
-  ) +
-  ggplot2::scale_y_continuous(
-    limits=c(0,NA),expand=ggplot2::expansion(mult=c(0,.04))
-  ) +
-  ggplot2::labs(
-    title="Observed groundwater DO and river endmember reference",
-    subtitle="River reference: posterior median and central 95% credible band",
-    x="Mean residence time (years)",y="Dissolved oxygen (mg/L)",
-    caption=NULL
-  ) +
-  ggplot2::theme_bw(base_size=12) +
-  ggplot2::theme(
-    panel.grid.minor=ggplot2::element_blank(),
-    plot.title=ggplot2::element_text(face="bold"),
-    plot.subtitle=ggplot2::element_text(size=10),
-    strip.text=ggplot2::element_text(face="bold"),
-    legend.position="inside",
-    legend.position.inside=c(.98,.98),
-    legend.justification=c(1,1),
-    legend.direction="vertical",
-    legend.box="vertical",
-    legend.box.just="left",
-    legend.box.background=ggplot2::element_rect(fill="white",colour="grey80"),
-    legend.background=ggplot2::element_blank(),
-    legend.box.margin=ggplot2::margin(6,6,6,6)
-  ) +
-  ggplot2::guides(
-    colour=ggplot2::guide_colourbar(
-      order=1,title.position="top",direction="vertical",
-      barwidth=grid::unit(.35,"cm"),barheight=grid::unit(3,"cm")
-    ),
-    shape=ggplot2::guide_legend(order=2,ncol=1)
-  )
-
-outfile07 <- file.path(
-  plotdir07,paste0("13_DO_kinetic_trajectories_",suite07,".png")
-)
-ggplot2::ggsave(
-  outfile07,p07,width=12,height=10,units="in",dpi=300,bg="white"
-)
-print(p07)
-message("PLOT: ",normalizePath(outfile07))
-
-# 3. Plot the preferred first-order model.
-# This is a separate, self-contained plot: edit its appearance here.
-p07_variable <- ggplot2::ggplot() +
-  ggplot2::geom_ribbon(
-    data=curves07_variable,
-    ggplot2::aes(x=MRT,ymin=lower95,ymax=upper95),
-    fill=turbo07[32L],alpha=.16
-  ) +
-  ggplot2::geom_line(
-    data=curves07_variable,
-    ggplot2::aes(x=MRT,y=median),
-    colour="grey15",linewidth=.8,linetype="longdash"
-  ) +
-  ggplot2::geom_point(
-    data=points07_variable,
-    ggplot2::aes(x=MRT,y=DO_original,colour=lsr_fraction,shape=excluded_DO),
-    size=3.2,alpha=.88
-  ) +
-  ggplot2::geom_text(
-    data=labels07_variable,
-    ggplot2::aes(x=MRT,y=DO_original,label=Site_ID,hjust=label_hjust),
-    colour="grey20",vjust=-.9,size=3.5,show.legend=FALSE
-  ) +
-  ggplot2::scale_colour_gradientn(
-    colours=turbo07[32:230],limits=c(0,1),name="LSR fraction",
-    breaks=c(0,.25,.5,.75,1),labels=c("0%","25%","50%","75%","100%")
-  ) +
-  ggplot2::scale_shape_manual(
-    values=c(`FALSE`=16,`TRUE`=1),name=NULL,
-    labels=c(`FALSE`="DO used in fit",`TRUE`="DO excluded from fit")
-  ) +
-  ggplot2::scale_x_continuous(
-    limits=c(0,55),expand=ggplot2::expansion(c(0,0))
-  ) +
-  ggplot2::scale_y_continuous(
-    limits=c(0,NA),expand=ggplot2::expansion(mult=c(0,.04))
-  ) +
-  ggplot2::labs(
-    title="First-order river reference with uncertain river DO",
-    x="Mean residence time (years)",y="Dissolved oxygen (mg/L)",
-    caption=NULL
-  ) +
-  ggplot2::theme_bw(base_size=13) +
-  ggplot2::theme(
-    panel.grid.minor=ggplot2::element_blank(),
-    plot.title=ggplot2::element_text(face="bold"),
-    legend.position="inside",
-    legend.position.inside=c(.98,.98),
-    legend.justification=c(1,1),
-    legend.direction="vertical",
-    legend.box="vertical",
-    legend.box.just="left",
-    legend.box.background=ggplot2::element_rect(fill="white",colour="grey80"),
-    legend.background=ggplot2::element_blank(),
-    legend.box.margin=ggplot2::margin(6,6,6,6)
-  ) +
-  ggplot2::guides(
-    colour=ggplot2::guide_colourbar(
-      order=1,title.position="top",direction="vertical",
-      barwidth=grid::unit(.35,"cm"),barheight=grid::unit(3,"cm")
-    ),
-    shape=ggplot2::guide_legend(order=2,ncol=1)
-  )
-
-outfile07_variable <- file.path(
-  plotdir07,
-  paste0("14_DO_first_order_variable_river_prior_",suite07,".png")
-)
-ggplot2::ggsave(
-  outfile07_variable,p07_variable,
-  width=10,height=8,units="in",dpi=300,bg="white"
-)
-print(p07_variable)
-message("PLOT: ",normalizePath(outfile07_variable))
-
-# 4. Print and save the summary table calculated above.
-summary_markdown07 <- c(
-  "# Preferred first-order model: posterior summary",
+writeLines(enc2utf8(c(
+  "# Preferred first-order DO model: posterior summary",
   "",
-  "Uncertain river-entry DO: Normal(7.5, 1.5\u00b2) mg/L prior, truncated to [0, 14.65].",
-  paste0("Saved fit: `",summary_fit_file07,"`."),
+  "River DO ~ Normal(7.5, 1.5\u00b2) mg/L, truncated to [0, 14.65].",
+  paste0("Saved fit: \u0060",fit_path05,"\u0060"),
   "",
-  paste0("| ",paste(names(summary_table07),collapse=" | ")," |"),
-  "| --- | ---: | ---: |",
-  apply(summary_table07,1,function(row)
-    paste0("| ",paste(row,collapse=" | ")," |")),
+  summary_table05,
   "",
-  "Central 95% credible intervals are the 2.5th and 97.5th posterior percentiles; units match the median column.",
-  "The aquifer rate is shared by both pathways. The LSR deficit is relative to assumed surface saturation; it is not a loss rate."
-)
-summary_path07 <- file.path(
-  plotdir07,paste0("15_DO_primary_posterior_summary_",suite07,".md")
-)
-writeLines(enc2utf8(summary_markdown07),summary_path07,useBytes=TRUE)
-cat("\nPreferred first-order model with uncertain river-entry DO\n\n")
-print(summary_table07,row.names=FALSE,right=FALSE)
-message("SUMMARY: ",normalizePath(summary_path07))
+  "The LSR DO deficit is a concentration difference, not a rate.",
+  "The DO vs MRT figures are in-sample posterior diagnostics, not held-out CV."
+)),summary_path05,useBytes=TRUE)
+print(summary05,row.names=FALSE,digits=5)
+message("SUMMARY: ",normalizePath(summary_path05))
