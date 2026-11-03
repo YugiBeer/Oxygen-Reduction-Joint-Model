@@ -13,7 +13,7 @@ Open the repository as your R working directory and ensure the private input fil
 | [`03_river_DO_grouped_CV.R`](scripts/03_river_DO_grouped_CV.R) | Matched 5-fold held-out DO comparison, with diagnostics and paired group bootstrap; reuses saved fold fits | **Yes — only if necessary** |
 | [`01_DO_plotting.R`](scripts/01_DO_plotting.R) | Figures for final 04 parameter summaries and 05 CV (no old 01 results required) | **No** |
 | [`04_DO_posterior_distributions.R`](scripts/04_DO_posterior_distributions.R) | **One** preferred-model first-order rate posterior plot; verifies posterior summaries directly from the saved fit | **No** |
-| [`05_DO_kinetic_trajectories and summary.R`](scripts/05_DO_kinetic_trajectories%20and%20summary.R) | Two DO–MRT plots: observed versus fitted mixed DO, and river-derived sample DO contribution versus 100% river reference; also writes a four-parameter posterior table | **No** |
+| [`05_DO_kinetic_trajectories and summary.R`](scripts/05_DO_kinetic_trajectories%20and%20summary.R) | **Three DO–MRT plots:** (1) measured versus fitted mixed DO with predictive whiskers; (2) raw sample DO against the 100%-river decay reference; (3) river-derived contribution with posterior whiskers; plus four-parameter posterior table | **No** |
 | [`06_DO_LSR_MRT_sensitivity.R`](scripts/06_DO_LSR_MRT_sensitivity.R) | One-at-a-time robustness check: recharge temperature, LSR-survival prior and MRT uncertainty; reuses saved broad-prior first-order baseline | **Yes — 7 additional fits, cached** |
 
 Recommended sequence **for a new run** (each `source()` is a separate Positron R-console command):
@@ -24,7 +24,7 @@ source("scripts/02_river_DO_prior_sensitivity.R")    # fit four full-data models
 source("scripts/03_river_DO_grouped_CV.R")           # CV; reuses valid cached fits
 source("scripts/01_DO_plotting.R")                   # plots only
 source("scripts/04_DO_posterior_distributions.R")   # one preferred-rate posterior figure
-source("scripts/05_DO_kinetic_trajectories and summary.R") # two DO-MRT figures
+source("scripts/05_DO_kinetic_trajectories and summary.R") # three DO-MRT figures
 source("scripts/06_DO_LSR_MRT_sensitivity.R")        # robustness fits; cached if complete
 ```
 
@@ -45,7 +45,7 @@ source("scripts/06_DO_LSR_MRT_sensitivity.R")        # robustness fits; cached i
 - Full posterior fits/diagnostics: `outputs/04_river_DO_prior/2801_masked_no2130/`.
 - Grouped CV results/bootstrap: `outputs/05_river_DO_grouped_CV/2801_masked_no2130/`.
 - CV and parameter-summary plots: `plots/final_39well/`.
-- **Two DO–MRT figures** and four-parameter posterior summary: `plots/final_39well/`. The fitted mixed-groundwater plot uses `mean_DO` and 95% in-sample intervals from `replicated_DO`. The river-contribution plot uses **joint** `(1-f_LSR)*river_DO_after_aquifer` draws; the river-only reference is not the expected mixed-sample DO.
+- **Three DO–MRT figures** and four-parameter posterior summary: `plots/final_39well/`. The measured/fitted plot uses `mean_DO` and 95% in-sample intervals from `replicated_DO`. The intermediate raw-sample plot displays measured DO against the **100%-river** reference and is not a fitted-observation comparison. The river-contribution plot uses **joint** `(1-f_LSR)*river_DO_after_aquifer` draws; the river-only reference is not the expected mixed-sample DO. The three current filenames begin `13_DO_observed_vs_fitted_mixed_`, `14_DO_river_reference_raw_samples_`, and `15_DO_river_contribution_`, all ending `_2801_masked_no2130.png`. The posterior summary Markdown output now starts `16_DO_primary_posterior_summary_`.
 - **One preferred-rate posterior plot** and posterior-draw summary CSV: `plots/04_river_DO_prior/2801_masked_no2130/posterior_distributions/`. The previous seven-figure plotter is preserved in `archive/scripts/06_DO_posterior_distributions_legacy.R` (not in the active workflow).
 - Script 06 sensitivity summaries and fits: `outputs/07_DO_LSR_MRT_sensitivity/2801_masked_no2130/`; figures: `plots/07_DO_LSR_MRT_sensitivity/2801_masked_no2130/`.
 
@@ -66,3 +66,7 @@ All fitted models assign **the same well-specific effective aquifer MRT** to the
 ### Repository audit, November 2026
 
 The active working analysis scripts are **00–06** after the user's renumbering, plus a separate `scripts/tests.R` scratch plotting file; historical development code is in `archive/`. Fitting script 02, CV script 03, setup and the Stan model were left untouched: altering model inputs, setup, or Stan would invalidate the existing script-05 CV fit design checksum. Script 04 is a lightweight **one-figure** posterior plotter; its seven-figure predecessor is archived. Plots and fit data are local-only; the numerical values recorded here come from the user's reported results, not a re-execution of Stan on GitHub.
+
+### Linking the report to reproducible DO–MRT figures
+
+The LaTeX report should reference the **script-generated PNGs under `plots/final_39well/`**, not uploaded/mobile screenshot copies. Run `source("scripts/05_DO_kinetic_trajectories and summary.R")` from the project root to regenerate all three figures using the saved model fit, without MCMC. If the TeX document is in `docs/`, the relative figure directory is `../plots/final_39well/`; if it is in the repository root, use `plots/final_39well/`. The `plots/` folder is gitignored. Compile the report **after** generating the figures. The PDF can only contain the actual latest plot outputs on a machine where those files are accessible.
