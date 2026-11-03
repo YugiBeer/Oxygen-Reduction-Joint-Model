@@ -1,0 +1,44 @@
+name: Compile Heretaunga DO PDF preview
+
+on:
+  push:
+    paths:
+      - "docs/heretaunga_do_model_report.tex"
+      - ".github/workflows/heretaunga-report.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Build PDF from tracked LaTeX
+        uses: xu-cheng/latex-action@v4
+        with:
+          root_file: heretaunga_do_model_report.tex
+          working_directory: docs
+          args: -pdf -file-line-error -halt-on-error -interaction=nonstopmode
+      - name: Confirm compiled PDF
+        run: |
+          test -s docs/heretaunga_do_model_report.pdf
+          echo "GitHub does not contain gitignored plots; this PDF is a preview with missing-output notices."
+      - name: Upload PDF as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: heretaunga-report-preview
+          path: docs/heretaunga_do_model_report.pdf
+      - name: Commit compiled preview PDF to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f docs/heretaunga_do_model_report.pdf
+          if ! git diff --cached --quiet; then
+            git commit -m "Auto-build Heretaunga report PDF preview (plots remain local)"
+            git push origin HEAD:main
+          fi
