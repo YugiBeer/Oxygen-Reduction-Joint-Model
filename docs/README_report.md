@@ -10,11 +10,14 @@ From the repository root, with your existing private data and fitted RDS objects
 source("scripts/05_DO_kinetic_trajectories and summary.R")
 ```
 
-The script generates these three PNGs in `plots/final_39well/`:
+The script generates **four** PNGs in `plots/final_39well/`; the LaTeX report displays **Plots 1, 2 and 4**:
 
 1. `13_DO_observed_vs_fitted_mixed_2801_masked_no2130.png` — measured DO versus fitted mixed-sample DO, with posterior predictive whiskers
 2. `14_DO_river_reference_raw_samples_2801_masked_no2130.png` — measured mixed-sample DO against the first-order 100% river-reference trajectory
-3. `15_DO_river_contribution_2801_masked_no2130.png` — inferred river-attributable DO contribution, with posterior credible whiskers and the river reference
+3. `15_DO_river_contribution_2801_masked_no2130.png` — inferred river-attributable DO contribution (script Plot 3; retained, but **not in the report**)
+4. `16_DO_fitted_components_2801_masked_no2130.png` — additive river/LSR source contributions as stacked posterior means, black point for the fitted total, observed DO markers, and 95% credible whiskers for the fitted mean (script Plot 4; **in the report**)
+
+The four-parameter model summary is now saved as `17_DO_primary_posterior_summary_2801_masked_no2130.md`. Plot 4 uses posterior means so blue plus red equals the fitted total; this is deliberate, and differs slightly from the fitted posterior medians in Plot 1.
 
 Then from the repository root, run:
 
@@ -22,7 +25,7 @@ Then from the repository root, run:
 bash docs/build_heretaunga_report.sh
 ```
 
-It checks that all three generated PNG files exist and compiles `docs/heretaunga_do_model_report.pdf`. The report's LaTeX figure macros automatically resolve relative paths from `docs/`.
+It checks that the three selected PNG files (Plots 1, 2 and 4) exist and compiles `docs/heretaunga_do_model_report.pdf`. The report's LaTeX figure macros automatically resolve relative paths from `docs/`.
 
 **The output directories `outputs/` and `plots/` are gitignored.** They contain saved model objects and regenerated figures and stay local. Pulling the repository cannot transfer them. A GitHub-compiled PDF, if present, is a **preview with missing-output notices**, since GitHub does not have those files. Run the build script locally to produce a report containing the actual plots.
 
