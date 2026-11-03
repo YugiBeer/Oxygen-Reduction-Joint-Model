@@ -3,6 +3,8 @@
 # FOUR complementary DO vs MRT plots for the preferred model:
 #  1. Observed mixed-groundwater DO against its sample-specific fitted DO
 #     (mean_DO), with 95% posterior predictive intervals (replicated_DO).
+#  1b. Mixing-adjusted observed DO survival versus the shared fitted
+#      first-order survival curve exp(-k*t); a standalone exploratory plot.
 #  2. RAW measured mixed-groundwater DO against the posterior river-only
 #     100%-river reference (no sample-level fitted DO in this panel).
 #  3. Sample-specific DO attributable to river recharge,
@@ -14,6 +16,10 @@
 # Plot 4 uses POSTERIOR MEANS for its stacked source contributions and
 # fitted total, so the components sum exactly; the first plot continues
 # to use posterior medians for the fitted point values.
+#
+# Plot 1b uses posterior-draw initial mixed DO (and its uncertainty) to
+# normalise each observation; the normalised observations are NOT raw
+# independent data and are NOT used to refit k.
 #
 # The river-only trajectory is NOT the fitted mean of the mixed samples.
 # No Stan sampling or modification of fitted objects occurs.
@@ -197,6 +203,107 @@ p_fit05 <- ggplot2::ggplot(wells05,ggplot2::aes(x=MRT)) +
   ) + theme05
 save05(p_fit05,
        paste0("13_DO_observed_vs_fitted_mixed_",suite05,".png"),
+       width=11,height=7.5)
+
+# 1b. Mixing-adjusted observed DO vs the shared fitted first-order curve.
+# For each posterior draw, the sample's DO at aquifer entry is
+#    C0_i = (1-f_LSR_i)*river_DO + f_LSR_i*LSR_DO_at_water_table.
+# In the first-order model, E[DO_i]/C0_i = exp(-k*true_MRT_i).
+# Dividing the actual OBSERVATION by C0_i (draw by draw) makes the
+# samples comparable regardless of their inferred recharge mixture.
+# Note: C0_i is estimated using the same joint model as k; adjusted
+# observations are therefore NOT independent measurements of survival.
+# The smooth reference is evaluated at the REPORTED MRT, while fitted
+# concentrations use latent uncertain MRT in the model.
+initial_mixed_DO05 <- sweep(1-f05,1,start05,"*") +
+  sweep(f05,1,z05[,"LSR_DO_at_water_table"],"*")
+if (any(!is.finite(initial_mixed_DO05)) ||
+    any(initial_mixed_DO05 <= 0))
+  stop("Non-positive or non-finite initial mixed DO; cannot normalise observations.")
+
+adjusted_obs05 <- sweep(
+  1/initial_mixed_DO05,2,wells05$DO_observed,"*"
+)
+wells1b05 <- wells05
+wells1b05$adjusted_observed <- apply(adjusted_obs05,2,stats::median)
+wells1b05$adjusted_lower95 <- qcol05(adjusted_obs05,0.025)
+wells1b05$adjusted_upper95 <- qcol05(adjusted_obs05,0.975)
+excluded1b05 <- wells1b05[wells1b05$excluded_DO,,drop=FALSE]
+
+# This curve is NOT fitted a second time. It uses exactly the posterior
+# k draws from the joint Bayesian DO-and-mixing model.
+survival_draws05 <- vapply(
+  mrt_grid05,
+  function(t) exp(-rate05*t),
+  numeric(nrow(z05))
+)
+survival_curve05 <- data.frame(
+  MRT=mrt_grid05,
+  median=apply(survival_draws05,2,stats::median),
+  lower95=qcol05(survival_draws05,0.025),
+  upper95=qcol05(survival_draws05,0.975)
+)
+
+k_text05 <- paste0(
+  "Joint-model k = ",sprintf("%.3f",stats::median(rate05)),
+  " yr^-1 (95% CrI ",
+  sprintf("%.3f",stats::quantile(rate05,0.025)),"-",
+  sprintf("%.3f",stats::quantile(rate05,0.975)),")"
+)
+
+p_adjusted05 <- ggplot2::ggplot() +
+  ggplot2::geom_ribbon(
+    data=survival_curve05,
+    ggplot2::aes(x=MRT,ymin=lower95,ymax=upper95),
+    fill=river_blue05,alpha=.16
+  ) +
+  ggplot2::geom_line(
+    data=survival_curve05,
+    ggplot2::aes(x=MRT,y=median),
+    colour="grey20",linewidth=.95,linetype="longdash"
+  ) +
+  ggplot2::geom_linerange(
+    data=wells1b05,
+    ggplot2::aes(x=MRT,ymin=adjusted_lower95,
+                 ymax=adjusted_upper95,colour=f_LSR),
+    linewidth=.75,alpha=.65
+  ) +
+  ggplot2::geom_point(
+    data=wells1b05,
+    ggplot2::aes(x=MRT,y=adjusted_observed,
+                 colour=f_LSR,shape=excluded_DO),
+    size=3,alpha=.95,stroke=.85
+  ) +
+  ggplot2::geom_text(
+    data=excluded1b05,
+    ggplot2::aes(x=MRT,y=adjusted_observed,label=Site_ID),
+    colour="grey20",vjust=-.9,size=3.4,show.legend=FALSE
+  ) +
+  gradient05 +
+  ggplot2::scale_shape_manual(
+    values=c("FALSE"=16,"TRUE"=4),
+    labels=c("FALSE"="DO used in fit","TRUE"="DO excluded from fit"),
+    name="Normalised observed DO"
+  ) +
+  ggplot2::scale_y_continuous(
+    expand=ggplot2::expansion(mult=c(.03,.08))
+  ) +
+  ggplot2::labs(
+    title="Mixing-adjusted DO and first-order aquifer survival (Plot 1b)",
+    subtitle=k_text05,
+    x="Reported groundwater MRT (years)",
+    y="Observed DO / inferred initial mixed DO (dimensionless)",
+    caption=paste(
+      "Points: measured DO divided by each sample's posterior initial mixed DO;",
+      "point whiskers: 95% credible intervals from the inferred denominator only.",
+      "Dashed curve and band: exp(-k x reported MRT), posterior median and 95% credible interval.",
+      "This is a model-conditioned visualisation, NOT a separate regression or held-out validation.",
+      "2801 and 2130 DO were excluded from fitting."
+    )
+  ) + theme05
+
+save05(p_adjusted05,
+       paste0("13b_DO_mixing_adjusted_decay_",suite05,".png"),
        width=11,height=7.5)
 
 # 2. Observed mixed samples against the 100%-river-only reference.
@@ -421,6 +528,7 @@ writeLines(enc2utf8(c(
   "",
   "The LSR DO deficit is a concentration difference, not a rate.",
   "The DO vs MRT figures are in-sample posterior diagnostics, not held-out CV.",
+  "Plot 1b shows observed DO normalised by posterior initial mixed DO against the shared fitted first-order survival curve. Its point whiskers propagate only normalisation uncertainty.",
   "Panel 2 plots raw sample DO against the river-only reference; its band is not a mixed-sample predictive interval.",
   "Panel 4 uses additive POSTERIOR MEAN source contributions; its whiskers describe uncertainty in fitted mean DO, not replicated observations."
 )),summary_path05,useBytes=TRUE)
