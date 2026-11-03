@@ -4,9 +4,11 @@ set -euo pipefail
 here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd -- "$here/.." && pwd)"
 figures=(
-  "13_DO_observed_vs_fitted_mixed_2801_masked_no2130.png"
-  "14_DO_river_reference_raw_samples_2801_masked_no2130.png"
-  "16_DO_fitted_components_2801_masked_no2130.png"
+  "01_DO_mixing_adjusted_decay_2801_masked_no2130.png"
+  "02_DO_observed_vs_fitted_mixed_2801_masked_no2130.png"
+  "03_DO_river_reference_raw_samples_2801_masked_no2130.png"
+  "04_DO_river_contribution_2801_masked_no2130.png"
+  "05_DO_fitted_components_2801_masked_no2130.png"
 )
 for name in "${figures[@]}"; do
   file="$root/plots/final_39well/$name"
@@ -20,4 +22,4 @@ command -v pdflatex >/dev/null || { echo "pdflatex is required for this report" 
 cd "$here"
 pdflatex -interaction=nonstopmode -halt-on-error heretaunga_do_model_report.tex
 pdflatex -interaction=nonstopmode -halt-on-error heretaunga_do_model_report.tex
-printf 'Created %s/heretaunga_do_model_report.pdf with script-generated Plots 1, 2 and 4.\n' "$here"
+printf 'Created %s/heretaunga_do_model_report.pdf with all five script-generated plots.\n' "$here"
