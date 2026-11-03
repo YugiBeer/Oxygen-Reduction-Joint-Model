@@ -108,11 +108,11 @@ if (sum(!wells05$excluded_DO)!=39L ||
 mrt_grid05 <- seq(0,max(d$MRT,na.rm=TRUE)*1.05,length.out=251L)
 start05 <- z05[,"river_DO"]
 rate05 <- z05[,"k_ref"]
-river_curve05 <- t(vapply(
+river_curve05 <- vapply(
   mrt_grid05,
   function(t) start05*exp(-rate05*t),
   numeric(nrow(z05))
-))
+)
 curve05 <- data.frame(
   MRT=mrt_grid05,
   median=apply(river_curve05,2,stats::median),
