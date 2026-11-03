@@ -2,7 +2,7 @@
 
 ## Technical report (LaTeX and PDF)
 
-The full report source is tracked at [`docs/heretaunga_do_model_report.tex`](docs/heretaunga_do_model_report.tex), with the [local build script](docs/build_heretaunga_report.sh) and [instructions](docs/README_report.md). Run `scripts/05_DO_kinetic_trajectories and summary.R` and then `bash docs/build_heretaunga_report.sh` to regenerate the PDF from the three current DO–MRT plot PNGs in `plots/final_39well/`. No model refitting is needed.
+The full report source is tracked at [`docs/heretaunga_do_model_report.tex`](docs/heretaunga_do_model_report.tex), with the [local build script](docs/build_heretaunga_report.sh) and [instructions](docs/README_report.md). Run `scripts/05_DO_kinetic_trajectories and summary.R` and then `bash docs/build_heretaunga_report.sh` to regenerate the PDF using script-generated **Plots 1, 2 and 4** from `plots/final_39well/`. Script 05 still creates all four plots; the source-decomposition Plot 4 is the new main-report figure. No model refitting is needed.
 
 A [compiled PDF preview](docs/heretaunga_do_model_report.pdf) is maintained through a GitHub Action. Because `plots/` and `outputs/` are intentionally gitignored and absent from GitHub, the preview has explicit missing-plot notices. **The locally rebuilt PDF is the complete version with the actual model-generated figures.** The LaTeX never references the screenshot uploads.
 
@@ -20,7 +20,7 @@ Open the repository as your R working directory and ensure the private input fil
 | [`03_river_DO_grouped_CV.R`](scripts/03_river_DO_grouped_CV.R) | Matched 5-fold held-out DO comparison, with diagnostics and paired group bootstrap; reuses saved fold fits | **Yes — only if necessary** |
 | [`01_DO_plotting.R`](scripts/01_DO_plotting.R) | Figures for final 04 parameter summaries and 05 CV (no old 01 results required) | **No** |
 | [`04_DO_posterior_distributions.R`](scripts/04_DO_posterior_distributions.R) | **One** preferred-model first-order rate posterior plot; verifies posterior summaries directly from the saved fit | **No** |
-| [`05_DO_kinetic_trajectories and summary.R`](scripts/05_DO_kinetic_trajectories%20and%20summary.R) | **Three DO–MRT plots:** (1) measured versus fitted mixed DO with predictive whiskers; (2) raw sample DO against the 100%-river decay reference; (3) river-derived contribution with posterior whiskers; plus four-parameter posterior table | **No** |
+| [`05_DO_kinetic_trajectories and summary.R`](scripts/05_DO_kinetic_trajectories%20and%20summary.R) | **Four DO–MRT plots:** (1) measured vs fitted mixed DO; (2) raw DO vs river-only reference; (3) river contribution; (4) additive river and LSR contributions, with measured and fitted total DO. The report uses **1, 2 and 4**. | **No** |
 | [`06_DO_LSR_MRT_sensitivity.R`](scripts/06_DO_LSR_MRT_sensitivity.R) | One-at-a-time robustness check: recharge temperature, LSR-survival prior and MRT uncertainty; reuses saved broad-prior first-order baseline | **Yes — 7 additional fits, cached** |
 
 Recommended sequence **for a new run** (each `source()` is a separate Positron R-console command):
@@ -31,7 +31,7 @@ source("scripts/02_river_DO_prior_sensitivity.R")    # fit four full-data models
 source("scripts/03_river_DO_grouped_CV.R")           # CV; reuses valid cached fits
 source("scripts/01_DO_plotting.R")                   # plots only
 source("scripts/04_DO_posterior_distributions.R")   # one preferred-rate posterior figure
-source("scripts/05_DO_kinetic_trajectories and summary.R") # three DO-MRT figures
+source("scripts/05_DO_kinetic_trajectories and summary.R") # four DO-MRT figures (report uses 1,2,4)
 source("scripts/06_DO_LSR_MRT_sensitivity.R")        # robustness fits; cached if complete
 ```
 
@@ -52,7 +52,7 @@ source("scripts/06_DO_LSR_MRT_sensitivity.R")        # robustness fits; cached i
 - Full posterior fits/diagnostics: `outputs/04_river_DO_prior/2801_masked_no2130/`.
 - Grouped CV results/bootstrap: `outputs/05_river_DO_grouped_CV/2801_masked_no2130/`.
 - CV and parameter-summary plots: `plots/final_39well/`.
-- **Three DO–MRT figures** and four-parameter posterior summary: `plots/final_39well/`. The measured/fitted plot uses `mean_DO` and 95% in-sample intervals from `replicated_DO`. The intermediate raw-sample plot displays measured DO against the **100%-river** reference and is not a fitted-observation comparison. The river-contribution plot uses **joint** `(1-f_LSR)*river_DO_after_aquifer` draws; the river-only reference is not the expected mixed-sample DO. The three current filenames begin `13_DO_observed_vs_fitted_mixed_`, `14_DO_river_reference_raw_samples_`, and `15_DO_river_contribution_`, all ending `_2801_masked_no2130.png`. The posterior summary Markdown output now starts `16_DO_primary_posterior_summary_`.
+- **Four DO–MRT figures** and one four-parameter posterior summary: `plots/final_39well/`. Script Plot 1 compares measured DO against posterior-median fitted mixed DO with 95% posterior **predictive** whiskers; Plot 2 shows raw DO relative to a 100%-river-only reference (not a sample prediction); Plot 3 shows inferred river contribution against the unweighted river reference (retained but omitted from the main report). **New Plot 4** stacks posterior-mean river and LSR DO contributions, so their sum equals the posterior-mean fitted total, overlaid with measured DO and 95% **credible** whiskers for the fitted mean. The four filenames start `13_DO_observed_vs_fitted_mixed_`, `14_DO_river_reference_raw_samples_`, `15_DO_river_contribution_`, and `16_DO_fitted_components_`, each ending `2801_masked_no2130.png`. The posterior summary Markdown filename starts `17_DO_primary_posterior_summary_`. The report displays script Plots **1, 2 and 4** only.
 - **One preferred-rate posterior plot** and posterior-draw summary CSV: `plots/04_river_DO_prior/2801_masked_no2130/posterior_distributions/`. The previous seven-figure plotter is preserved in `archive/scripts/06_DO_posterior_distributions_legacy.R` (not in the active workflow).
 - Script 06 sensitivity summaries and fits: `outputs/07_DO_LSR_MRT_sensitivity/2801_masked_no2130/`; figures: `plots/07_DO_LSR_MRT_sensitivity/2801_masked_no2130/`.
 
@@ -76,4 +76,4 @@ The active working analysis scripts are **00–06** after the user's renumbering
 
 ### Linking the report to reproducible DO–MRT figures
 
-The LaTeX report should reference the **script-generated PNGs under `plots/final_39well/`**, not uploaded/mobile screenshot copies. Run `source("scripts/05_DO_kinetic_trajectories and summary.R")` from the project root to regenerate all three figures using the saved model fit, without MCMC. If the TeX document is in `docs/`, the relative figure directory is `../plots/final_39well/`; if it is in the repository root, use `plots/final_39well/`. The `plots/` folder is gitignored. Compile the report **after** generating the figures. The PDF can only contain the actual latest plot outputs on a machine where those files are accessible.
+The LaTeX report should reference the **script-generated PNGs under `plots/final_39well/`**, not uploaded/mobile screenshot copies. Run `source("scripts/05_DO_kinetic_trajectories and summary.R")` from the project root to regenerate **all four** figures using the saved model fit, without MCMC. The LaTeX source and build script use outputs 13, 14 and 16 (Plots 1, 2 and 4). If the TeX document is in `docs/`, the relative figure directory is `../plots/final_39well/`; if it is in the repository root, use `plots/final_39well/`. The `plots/` folder is gitignored. Compile the report **after** generating the figures. The PDF can only contain the actual latest plot outputs on a machine where those files are accessible.
