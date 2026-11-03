@@ -1,25 +1,22 @@
 # 05_DO_kinetic_trajectories and summary.R
 #
-# FOUR complementary DO vs MRT plots for the preferred model:
-#  1. Observed mixed-groundwater DO against its sample-specific fitted DO
+# FIVE complementary DO vs MRT plots for the preferred model:
+#  1. Mixing-adjusted observed DO divided by its inferred initial
+#     mixed-source DO, alongside the common exp(-k*t) decay curve.
+#  2. Observed mixed-groundwater DO against its sample-specific fitted DO
 #     (mean_DO), with 95% posterior predictive intervals (replicated_DO).
-#  1b. Mixing-adjusted observed DO survival versus the shared fitted
-#      first-order survival curve exp(-k*t); a standalone exploratory plot.
-#  2. RAW measured mixed-groundwater DO against the posterior river-only
-#     100%-river reference (no sample-level fitted DO in this panel).
-#  3. Sample-specific DO attributable to river recharge,
-#     (1 - f_LSR) * river_DO_after_aquifer, alongside the same
-#     100%-river reference trajectory.
-#  4. STACKED fitted river and LSR DO contributions, overlaid with
-#     measured mixed DO and a credible interval for the fitted total.
+#  3. RAW measured mixed-groundwater DO against the posterior river-only
+#     100%-river reference (not a fit to the observed mixed samples).
+#  4. Sample-specific DO attributable to river recharge,
+#     (1 - f_LSR) * river_DO_after_aquifer, versus that reference.
+#  5. STACKED fitted river and LSR DO contributions, with
+#     observed mixed DO and a credible interval for the fitted total.
 #
-# Plot 4 uses POSTERIOR MEANS for its stacked source contributions and
-# fitted total, so the components sum exactly; the first plot continues
-# to use posterior medians for the fitted point values.
-#
-# Plot 1b uses posterior-draw initial mixed DO (and its uncertainty) to
-# normalise each observation; the normalised observations are NOT raw
-# independent data and are NOT used to refit k.
+# Plot 1's measured DO is normalised by its posterior initial mixed
+# concentration. The points are model-conditioned, not independent
+# measurements of the common first-order survival curve.
+# Plot 5 uses POSTERIOR MEANS for its additive source contributions;
+# Plot 2 uses posterior medians and posterior predictive intervals.
 #
 # The river-only trajectory is NOT the fitted mean of the mixed samples.
 # No Stan sampling or modification of fitted objects occurs.
@@ -158,54 +155,7 @@ save05 <- function(plot,file,width=10,height=7) {
 
 excluded05 <- wells05[wells05$excluded_DO,,drop=FALSE]
 
-# 1. Goodness-of-fit: compare OBSERVED mixed DO with fitted MIXED DO.
-# 95% ranges are POSTERIOR PREDICTIVE for a sample observation,
-# not just uncertainty on the conditional mean or a river reference.
-p_fit05 <- ggplot2::ggplot(wells05,ggplot2::aes(x=MRT)) +
-  ggplot2::geom_segment(
-    ggplot2::aes(xend=MRT,y=DO_observed,yend=DO_fitted),
-    colour="grey70",linewidth=.55
-  ) +
-  ggplot2::geom_linerange(
-    ggplot2::aes(ymin=DO_pred_lower95,
-                 ymax=DO_pred_upper95,colour=f_LSR),
-    linewidth=.8,alpha=.60
-  ) +
-  ggplot2::geom_point(
-    ggplot2::aes(y=DO_observed,shape=excluded_DO),
-    colour="grey15",size=3,stroke=.85
-  ) +
-  ggplot2::geom_point(
-    ggplot2::aes(y=DO_fitted,colour=f_LSR),
-    size=2.5,alpha=.95
-  ) +
-  ggplot2::geom_text(
-    data=excluded05,
-    ggplot2::aes(y=DO_observed,label=Site_ID),
-    colour="grey20",vjust=-.9,size=3.4,show.legend=FALSE
-  ) +
-  gradient05 +
-  ggplot2::scale_shape_manual(
-    values=c("FALSE"=1,"TRUE"=4),
-    labels=c("FALSE"="DO used in fit","TRUE"="DO excluded from fit"),
-    name="Observed DO"
-  ) +
-  ggplot2::scale_y_continuous(
-    expand=ggplot2::expansion(mult=c(.03,.06))
-  ) +
-  ggplot2::coord_cartesian(ylim=c(0,11)) +
-  ggplot2::labs(
-    title="Observed and model-fitted groundwater DO",
-    subtitle="Open circles / crosses: measured DO; coloured points: fitted mixed-groundwater DO",
-    x="Reported groundwater MRT (years)",
-    y="Dissolved oxygen (mg/L)",
-    caption="Vertical ranges: 95% in-sample posterior predictive intervals; 2801 and 2130 DO excluded from fitting."
-  ) + theme05
-save05(p_fit05,
-       paste0("13_DO_observed_vs_fitted_mixed_",suite05,".png"),
-       width=11,height=7.5)
-
-# 1b. Mixing-adjusted observed DO vs the shared fitted first-order curve.
+# 1. Mixing-adjusted observed DO vs the shared fitted first-order curve.
 # For each posterior draw, the sample's DO at aquifer entry is
 #    C0_i = (1-f_LSR_i)*river_DO + f_LSR_i*LSR_DO_at_water_table.
 # In the first-order model, E[DO_i]/C0_i = exp(-k*true_MRT_i).
@@ -289,7 +239,7 @@ p_adjusted05 <- ggplot2::ggplot() +
     expand=ggplot2::expansion(mult=c(.03,.08))
   ) +
   ggplot2::labs(
-    title="Mixing-adjusted DO and first-order aquifer survival (Plot 1b)",
+    title="Mixing-adjusted DO and first-order aquifer survival (Plot 1)",
     subtitle=k_text05,
     x="Reported groundwater MRT (years)",
     y="Observed DO / inferred initial mixed DO (dimensionless)",
@@ -303,10 +253,57 @@ p_adjusted05 <- ggplot2::ggplot() +
   ) + theme05
 
 save05(p_adjusted05,
-       paste0("13b_DO_mixing_adjusted_decay_",suite05,".png"),
+       paste0("01_DO_mixing_adjusted_decay_",suite05,".png"),
        width=11,height=7.5)
 
-# 2. Observed mixed samples against the 100%-river-only reference.
+# 2. Goodness-of-fit: compare OBSERVED mixed DO with fitted MIXED DO.
+# 95% ranges are POSTERIOR PREDICTIVE for a sample observation,
+# not just uncertainty on the conditional mean or a river reference.
+p_fit05 <- ggplot2::ggplot(wells05,ggplot2::aes(x=MRT)) +
+  ggplot2::geom_segment(
+    ggplot2::aes(xend=MRT,y=DO_observed,yend=DO_fitted),
+    colour="grey70",linewidth=.55
+  ) +
+  ggplot2::geom_linerange(
+    ggplot2::aes(ymin=DO_pred_lower95,
+                 ymax=DO_pred_upper95,colour=f_LSR),
+    linewidth=.8,alpha=.60
+  ) +
+  ggplot2::geom_point(
+    ggplot2::aes(y=DO_observed,shape=excluded_DO),
+    colour="grey15",size=3,stroke=.85
+  ) +
+  ggplot2::geom_point(
+    ggplot2::aes(y=DO_fitted,colour=f_LSR),
+    size=2.5,alpha=.95
+  ) +
+  ggplot2::geom_text(
+    data=excluded05,
+    ggplot2::aes(y=DO_observed,label=Site_ID),
+    colour="grey20",vjust=-.9,size=3.4,show.legend=FALSE
+  ) +
+  gradient05 +
+  ggplot2::scale_shape_manual(
+    values=c("FALSE"=1,"TRUE"=4),
+    labels=c("FALSE"="DO used in fit","TRUE"="DO excluded from fit"),
+    name="Observed DO"
+  ) +
+  ggplot2::scale_y_continuous(
+    expand=ggplot2::expansion(mult=c(.03,.06))
+  ) +
+  ggplot2::coord_cartesian(ylim=c(0,11)) +
+  ggplot2::labs(
+    title="Observed and model-fitted groundwater DO",
+    subtitle="Open circles / crosses: measured DO; coloured points: fitted mixed-groundwater DO",
+    x="Reported groundwater MRT (years)",
+    y="Dissolved oxygen (mg/L)",
+    caption="Vertical ranges: 95% in-sample posterior predictive intervals; 2801 and 2130 DO excluded from fitting."
+  ) + theme05
+save05(p_fit05,
+       paste0("02_DO_observed_vs_fitted_mixed_",suite05,".png"),
+       width=11,height=7.5)
+
+# 3. Observed mixed samples against the 100%-river-only reference.
 # This is intentionally a PROCESS REFERENCE, not a model-observation
 # goodness-of-fit plot. All observed points include their LSR fraction.
 p_raw05 <- ggplot2::ggplot() +
@@ -348,10 +345,10 @@ p_raw05 <- ggplot2::ggplot() +
     caption="The 95% blue band describes river-only model uncertainty, NOT a predictive interval for mixed groundwater samples."
   ) + theme05
 save05(p_raw05,
-       paste0("14_DO_river_reference_raw_samples_",suite05,".png"),
+       paste0("03_DO_river_reference_raw_samples_",suite05,".png"),
        width=11,height=7.5)
 
-# 3. River-derived contribution to each mixed groundwater sample.
+# 4. River-derived contribution to each mixed groundwater sample.
 # Posterior contributions use JOINT draws of source fraction and river
 # concentration AFTER aquifer reaction, not products of separate medians.
 # The dashed line is the 100%-river REFERENCE, never the expected mixed DO.
@@ -395,10 +392,10 @@ p_river05 <- ggplot2::ggplot() +
     caption="Sample points = (1 - f_LSR) x river DO after aquifer reaction; vertical ranges and reference band are 95% posterior credible intervals."
   ) + theme05
 save05(p_river05,
-       paste0("15_DO_river_contribution_",suite05,".png"),
+       paste0("04_DO_river_contribution_",suite05,".png"),
        width=11,height=7.5)
 
-# 4. Fitted source decomposition: how river and LSR add to total DO.
+# 5. Fitted source decomposition: how river and LSR add to total DO.
 # Plot the posterior MEAN of each contribution, because posterior
 # means add exactly: E[river] + E[LSR] = E[total fitted DO].
 # A sum of separate posterior medians would not necessarily equal
@@ -484,7 +481,7 @@ p_components05 <- ggplot2::ggplot() +
   ) + theme05
 
 save05(p_components05,
-       paste0("16_DO_fitted_components_",suite05,".png"),
+       paste0("05_DO_fitted_components_",suite05,".png"),
        width=11,height=7.5)
 
 # ---- Four-parameter summary from the SAME preferred posterior --------
@@ -516,7 +513,7 @@ summary_table05 <- c(
   )),character(1))
 )
 summary_path05 <- file.path(
-  plot_dir05,paste0("17_DO_primary_posterior_summary_",suite05,".md")
+  plot_dir05,paste0("06_DO_primary_posterior_summary_",suite05,".md")
 )
 writeLines(enc2utf8(c(
   "# Preferred first-order DO model: posterior summary",
@@ -528,9 +525,9 @@ writeLines(enc2utf8(c(
   "",
   "The LSR DO deficit is a concentration difference, not a rate.",
   "The DO vs MRT figures are in-sample posterior diagnostics, not held-out CV.",
-  "Plot 1b shows observed DO normalised by posterior initial mixed DO against the shared fitted first-order survival curve. Its point whiskers propagate only normalisation uncertainty.",
-  "Panel 2 plots raw sample DO against the river-only reference; its band is not a mixed-sample predictive interval.",
-  "Panel 4 uses additive POSTERIOR MEAN source contributions; its whiskers describe uncertainty in fitted mean DO, not replicated observations."
+  "Plot 1 shows observed DO normalised by posterior initial mixed DO against the shared fitted first-order survival curve. Its point whiskers propagate only normalisation uncertainty.",
+  "Plot 3 plots raw sample DO against the river-only reference; its band is not a mixed-sample predictive interval.",
+  "Plot 5 uses additive POSTERIOR MEAN source contributions; its whiskers describe uncertainty in fitted mean DO, not replicated observations."
 )),summary_path05,useBytes=TRUE)
 print(summary05,row.names=FALSE,digits=5)
 message("SUMMARY: ",normalizePath(summary_path05))
