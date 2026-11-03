@@ -13,7 +13,8 @@
 # Legacy 7-figure comparison code is kept in
 # archive/scripts/06_DO_posterior_distributions_legacy.R
 
-if (!file.exists("scripts/04_river_DO_prior_sensitivity.R"))
+if (!file.exists("scripts/04_river_DO_prior_sensitivity.R") &&
+    !file.exists("scripts/02_river_DO_prior_sensitivity.R"))
   stop("Set the working directory to the repository root.")
 if (!requireNamespace("ggplot2",quietly=TRUE) ||
     !requireNamespace("posterior",quietly=TRUE) ||
