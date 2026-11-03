@@ -1,6 +1,6 @@
 # 05_DO_kinetic_trajectories and summary.R
 #
-# THREE complementary DO vs MRT plots for the preferred model:
+# FOUR complementary DO vs MRT plots for the preferred model:
 #  1. Observed mixed-groundwater DO against its sample-specific fitted DO
 #     (mean_DO), with 95% posterior predictive intervals (replicated_DO).
 #  2. RAW measured mixed-groundwater DO against the posterior river-only
@@ -8,6 +8,12 @@
 #  3. Sample-specific DO attributable to river recharge,
 #     (1 - f_LSR) * river_DO_after_aquifer, alongside the same
 #     100%-river reference trajectory.
+#  4. STACKED fitted river and LSR DO contributions, overlaid with
+#     measured mixed DO and a credible interval for the fitted total.
+#
+# Plot 4 uses POSTERIOR MEANS for its stacked source contributions and
+# fitted total, so the components sum exactly; the first plot continues
+# to use posterior medians for the fitted point values.
 #
 # The river-only trajectory is NOT the fitted mean of the mixed samples.
 # No Stan sampling or modification of fitted objects occurs.
@@ -285,6 +291,95 @@ save05(p_river05,
        paste0("15_DO_river_contribution_",suite05,".png"),
        width=11,height=7.5)
 
+# 4. Fitted source decomposition: how river and LSR add to total DO.
+# Plot the posterior MEAN of each contribution, because posterior
+# means add exactly: E[river] + E[LSR] = E[total fitted DO].
+# A sum of separate posterior medians would not necessarily equal
+# the posterior median of the total, so do not stack those medians.
+lsr_contrib05 <- mu05 - river_contrib05
+
+wells05$river_component_mean <- colMeans(river_contrib05)
+wells05$lsr_component_mean <- colMeans(lsr_contrib05)
+wells05$fitted_total_mean <- colMeans(mu05)
+wells05$fitted_lower95 <- qcol05(mu05,0.025)
+wells05$fitted_upper95 <- qcol05(mu05,0.975)
+
+stopifnot(
+  max(abs(wells05$river_component_mean +
+          wells05$lsr_component_mean -
+          wells05$fitted_total_mean)) < 1e-8
+)
+
+# Stacked vertical segments: blue from zero to river contribution,
+# red from the river contribution up to the full fitted concentration.
+components05 <- rbind(
+  data.frame(
+    MRT=wells05$MRT,
+    bottom=0,
+    top=wells05$river_component_mean,
+    source="River"
+  ),
+  data.frame(
+    MRT=wells05$MRT,
+    bottom=wells05$river_component_mean,
+    top=wells05$fitted_total_mean,
+    source="LSR"
+  )
+)
+
+p_components05 <- ggplot2::ggplot() +
+  ggplot2::geom_linerange(
+    data=wells05,
+    ggplot2::aes(x=MRT,ymin=fitted_lower95,ymax=fitted_upper95),
+    colour="grey60",linewidth=.75,alpha=.80
+  ) +
+  ggplot2::geom_segment(
+    data=components05,
+    ggplot2::aes(x=MRT,xend=MRT,y=bottom,yend=top,colour=source),
+    linewidth=2.3,alpha=.90
+  ) +
+  ggplot2::geom_point(
+    data=wells05,
+    ggplot2::aes(x=MRT,y=DO_observed,shape=excluded_DO),
+    colour="grey15",size=3.2,stroke=.9
+  ) +
+  ggplot2::geom_point(
+    data=wells05,
+    ggplot2::aes(x=MRT,y=fitted_total_mean),
+    colour="black",size=2.2
+  ) +
+  ggplot2::geom_text(
+    data=excluded05,
+    ggplot2::aes(x=MRT,y=DO_observed,label=Site_ID),
+    colour="grey20",vjust=-.9,size=3.4,show.legend=FALSE
+  ) +
+  ggplot2::scale_colour_manual(
+    values=c("River"=river_blue05,"LSR"=turbo05[230L]),
+    breaks=c("River","LSR"),
+    name="Fitted DO contribution"
+  ) +
+  ggplot2::scale_shape_manual(
+    values=c("FALSE"=1,"TRUE"=4),
+    labels=c("FALSE"="DO used in fit","TRUE"="DO excluded from fit"),
+    name="Observed DO"
+  ) +
+  ggplot2::coord_cartesian(ylim=c(0,11)) +
+  ggplot2::labs(
+    title="River and LSR contributions to fitted groundwater DO",
+    subtitle="Blue + red = fitted total (black dot); open circle / cross = observed DO",
+    x="Reported groundwater MRT (years)",
+    y="Dissolved oxygen (mg/L)",
+    caption=paste(
+      "Stacked contributions and black totals are posterior means;",
+      "grey whiskers are 95% credible intervals for fitted mean DO.",
+      "2801 and 2130 DO were excluded from calibration."
+    )
+  ) + theme05
+
+save05(p_components05,
+       paste0("16_DO_fitted_components_",suite05,".png"),
+       width=11,height=7.5)
+
 # ---- Four-parameter summary from the SAME preferred posterior --------
 labels05 <- c("River-entry DO","First-order aquifer rate",
               "LSR DO at water table","LSR DO deficit")
@@ -314,7 +409,7 @@ summary_table05 <- c(
   )),character(1))
 )
 summary_path05 <- file.path(
-  plot_dir05,paste0("16_DO_primary_posterior_summary_",suite05,".md")
+  plot_dir05,paste0("17_DO_primary_posterior_summary_",suite05,".md")
 )
 writeLines(enc2utf8(c(
   "# Preferred first-order DO model: posterior summary",
@@ -326,7 +421,8 @@ writeLines(enc2utf8(c(
   "",
   "The LSR DO deficit is a concentration difference, not a rate.",
   "The DO vs MRT figures are in-sample posterior diagnostics, not held-out CV.",
-  "Panel 2 plots raw sample DO against the river-only reference; its band is not a mixed-sample predictive interval."
+  "Panel 2 plots raw sample DO against the river-only reference; its band is not a mixed-sample predictive interval.",
+  "Panel 4 uses additive POSTERIOR MEAN source contributions; its whiskers describe uncertainty in fitted mean DO, not replicated observations."
 )),summary_path05,useBytes=TRUE)
 print(summary05,row.names=FALSE,digits=5)
 message("SUMMARY: ",normalizePath(summary_path05))
