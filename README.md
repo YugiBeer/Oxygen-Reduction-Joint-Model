@@ -22,6 +22,7 @@ Open the repository as your R working directory and ensure the private input fil
 | [`04_DO_posterior_distributions.R`](scripts/04_DO_posterior_distributions.R) | **One** preferred-model first-order rate posterior plot; verifies posterior summaries directly from the saved fit | **No** |
 | [`05_DO_kinetic_trajectories and summary.R`](scripts/05_DO_kinetic_trajectories%20and%20summary.R) | **Five DO–MRT plots in order:** 1 mixing-adjusted observations and fitted first-order survival; 2 measured versus fitted mixed DO; 3 raw DO versus river-only reference; 4 model-derived river DO contribution; 5 stacked river and LSR fitted contributions. All five appear in the LaTeX report. | **No** |
 | [`06_DO_LSR_MRT_sensitivity.R`](scripts/06_DO_LSR_MRT_sensitivity.R) | One-at-a-time robustness check: recharge temperature, LSR-survival prior and MRT uncertainty; reuses saved broad-prior first-order baseline | **Yes — 7 additional fits, cached** |
+| [`07_export_tracer_only_fractions.R`](scripts/07_export_tracer_only_fractions.R) | **Independent** O18 + Cl-only mixing inference; append water-fraction medians and intervals to a separate shareable CSV, preserving the original source | **Yes — one new fit; cached** |
 
 Recommended sequence **for a new run** (each `source()` is a separate Positron R-console command):
 
@@ -36,6 +37,18 @@ source("scripts/06_DO_LSR_MRT_sensitivity.R")        # robustness fits; cached i
 ```
 
 **If the existing full-data and CV fits and reports already exist, run only scripts 01, 04, and 05 for plotting.** Script 06 is a *separate sensitivity study*: the user has completed all seven new fits and reported passing diagnostics. It tests scientific assumptions, not whether the original chains were long enough. Do not rerun the fitting/CV scripts 02 or 03 just to regenerate plots. All four original full-data fits passed diagnostics; posterior bulk/tail ESS for key first-order parameters exceeded 3,000.
+
+### Conservative-tracer-only fractions for MRT / excess N₂
+
+To estimate **river and LSR water mixing proportions independently of the DO reaction model**, run:
+
+```r
+source("scripts/07_export_tracer_only_fractions.R")
+```
+
+This fits a **separate δ¹⁸O + chloride-only Bayesian model** (`stan/05_tracer_only_mixing.stan`) and appends river/LSR posterior medians and 95% credible intervals to a **new copy** of the original sample CSV: `data/Uwe_HP_data_prepared_with_tracer_fractions.csv`. The source CSV stays unchanged. Original rows and columns are retained; site 16758 is retained but not fitted, and single-tracer rows are flagged. The saved tracer-only posterior can be reused for uncertainty propagation. A new model fit is necessary the first time; it does **not** refit or modify the DO model.
+
+[Read the tracer-fraction methods and output-column definitions](docs/README_tracer_fractions.md). The new script is separate from the previously completed DO-model plotting and CV workflow.
 
 ### Model configuration and scientific findings
 
